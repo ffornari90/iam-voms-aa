@@ -60,6 +60,7 @@ services:
     command: /bin/bash -c "
         /wait-for-it.sh -t 0 $$DB_HOST:3306
         && if [ $$IAM_VERS == \"v1.6.0\" ]; then java -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap $$IAM_JAVA_OPTS -jar iam-login-service.war;
+         elif [ $$IAM_VERS == \"v1.7.2\" ]; then java -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap $$IAM_JAVA_OPTS -jar iam-login-service.war;
          elif [ $$IAM_VERS == \"v1.8.0\" ]; then java $$IAM_JAVA_OPTS org.springframework.boot.loader.WarLauncher;
          else echo 'IAM version '$$IAM_VERS' is not available'; fi
       "
