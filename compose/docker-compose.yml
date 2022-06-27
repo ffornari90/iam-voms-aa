@@ -59,7 +59,9 @@ services:
     container_name: iam-be
     command: /bin/bash -c "
         /wait-for-it.sh -t 0 $$DB_HOST:3306
-        && java -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap $$IAM_JAVA_OPTS -jar iam-login-service.war
+        && if [ $$IAM_VERS == \"v1.6.0\" ]; then java -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap $$IAM_JAVA_OPTS -jar iam-login-service.war;
+         elif [ $$IAM_VERS == \"v1.8.0\" ]; then java $$IAM_JAVA_OPTS org.springframework.boot.loader.WarLauncher;
+         else echo 'IAM version '$$IAM_VERS' is not available'; fi
       "
 
     environment: 
@@ -67,6 +69,7 @@ services:
       IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044 -Dspring.profiles.active=prod,registration
       IAM_JAR: /code/iam-login-service/target/iam-login-service.war
       DB_HOST: ${DB_HOSTNAME:-vnode-0.localdomain}
+      IAM_VERS: ${IAM_VERSION:-v1.6.0}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
       IAM_BASE_URL: ${IAM_URL:-https://iam-indigo.cr.cnaf.infn.it}
       IAM_ISSUER: ${IAM_ISSUER:-https://iam-indigo.cr.cnaf.infn.it}
