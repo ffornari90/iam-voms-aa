@@ -1,0 +1,149 @@
+version: "3.7"
+
+volumes:
+  data:
+  trustanchors:
+  cabundle:
+  certs:
+
+services:
+  trust:
+    image: ffornari/trustanchors:latest
+    container_name: trust
+
+    volumes:
+      - trustanchors:/etc/grid-security/certificates
+
+    ports:
+      - "8086:8086"
+
+  hostcert:
+    image: ffornari/hostcert:latest
+    container_name: hostcert
+    command: /bin/bash -c "
+        /wait-for-it.sh -t 0 $$IAM_HOST:8086
+        && cp /etc/grid-security/certificates/*.pem /etc/pki/ca-trust/source/anchors/
+        && update-ca-trust
+        && nc -l 8085
+      "
+
+    volumes:
+      - trustanchors:/etc/grid-security/certificates
+      - cabundle:/etc/pki
+      - certs:/etc/ssl/certs
+
+    ports:
+      - "8085:8085"
+
+    environment:
+      IAM_HOST: ${IAM_HOSTNAME:-vnode-0.localdomain}
+
+  db:
+    container_name: db
+    image: mysql:5.7
+    volumes:
+      - data:/var/lib/mysql
+    
+    environment:
+      TZ: Europe/Rome
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PWD:-pwd}
+      MYSQL_USER: ${MYSQL_USERNAME:-iam}
+      MYSQL_PASSWORD: ${MYSQL_PWD:-pwd}
+      MYSQL_DATABASE: ${MYSQL_DB:-iam}
+
+    ports:
+      - "3306:3306"
+  
+  iam-be:
+    image: ffornari/iam-login-service:${IAM_VERSION:-v1.6.0}
+    container_name: iam-be
+    command: /bin/bash -c "
+        /wait-for-it.sh -t 0 $$DB_HOST:3306
+        && java -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap $$IAM_JAVA_OPTS -jar iam-login-service.war
+      "
+
+    environment: 
+      TZ: Europe/Rome
+      IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044 -Dspring.profiles.active=prod,registration
+      IAM_JAR: /code/iam-login-service/target/iam-login-service.war
+      DB_HOST: ${DB_HOSTNAME:-vnode-0.localdomain}
+      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
+      IAM_BASE_URL: ${IAM_URL:-https://iam-indigo.cr.cnaf.infn.it}
+      IAM_ISSUER: ${IAM_ISSUER:-https://iam-indigo.cr.cnaf.infn.it}
+      IAM_USE_FORWARDED_HEADERS: "true"
+      IAM_NOTIFICATION_DISABLE: "true"
+      IAM_DB_HOST: ${MYSQL_DB:-db}
+      IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
+      IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
+  
+    ports:
+      - "8080:8080"
+
+  iam:
+    image: ffornari/nginx:latest
+    container_name: iam
+    command: /bin/bash -c "
+        envsubst '$${IAM_HOST}' < /etc/nginx/conf.d/mysite.template > /etc/nginx/conf.d/default.conf
+        && /wait-for-it.sh -t 0 $$IAM_HOST:8085
+        && nginx -g 'daemon off;'
+      "
+
+    volumes:
+      - certs:/certs
+
+    environment:
+      TZ: Europe/Rome
+      IAM_HOST: ${IAM_HOSTNAME:-vnode-0.localdomain}
+
+    ports:
+      - "443:443"
+      - "80:80"
+    
+  nginx-voms:
+    image: ffornari/ngx-voms:latest
+    container_name: nginx-voms
+    command: /bin/bash -c "
+        envsubst '$${IAM_HOST}' < /etc/nginx/conf.d/mysite.template > /etc/nginx/conf.d/srm.conf
+        && /wait-for-it.sh -t 0 $$IAM_HOST:443
+        && update-ca-trust
+        && echo '# GEANT eScience Personal CA 4' | tee -a /etc/pki/tls/certs/ca-bundle.crt
+        && cat /etc/grid-security/certificates/GEANTeSciencePersonalCA4.pem | tee -a /etc/pki/tls/certs/ca-bundle.crt
+        && /home/build/local/openresty/nginx/sbin/nginx -g 'daemon off;'
+      "
+
+    ports:
+      - "15000:443"
+
+    environment:
+      TZ: UTC
+      X509_VOMS_DIR: /vomsdir
+      IAM_HOST: ${IAM_HOSTNAME:-vnode-0.localdomain}
+
+    volumes:
+      - cabundle:/etc/pki
+      - trustanchors:/etc/grid-security/certificates
+      - certs:/certs
+      
+  vomsng:
+    image: ffornari/voms-aa:latest
+    hostname: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
+    command: /bin/bash -c "
+        /wait-for-it.sh -t 0 $$IAM_BE_HOST:8080
+        && java -XX:+UnlockExperimentalVMOptions -XX:+UseContainerSupport $$VOMS_NG_JAVA_OPTS -jar voms-aa.jar
+      "
+
+    environment:
+      TZ: Europe/Rome
+      IAM_BE_HOST: ${IAM_HOSTNAME:-vnode-0.localdomain}
+      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
+      IAM_DB_HOST: ${MYSQL_DB:-db}
+      IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
+      IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
+      VOMS_NG_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044
+    
+    ports:
+      - "9444:15000"
+
+    volumes:
+      - certs:/etc/grid-security/voms
+      - trustanchors:/etc/grid-security/certificates
