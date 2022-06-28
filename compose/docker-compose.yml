@@ -59,8 +59,8 @@ services:
     container_name: iam-be
     command: /bin/bash -c "
         /wait-for-it.sh -t 0 $$DB_HOST:3306
-        && if [ $$IAM_VERS == \"v1.6.0\" ]; then java -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap $$IAM_JAVA_OPTS -jar iam-login-service.war;
-         elif [ $$IAM_VERS == \"v1.7.2\" ]; then java -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap $$IAM_JAVA_OPTS -jar iam-login-service.war;
+        && if [ $$IAM_VERS == \"v1.6.0\" ]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
+         elif [ $$IAM_VERS == \"v1.7.2\" ]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
          elif [ $$IAM_VERS == \"v1.8.0\" ]; then java $$IAM_JAVA_OPTS org.springframework.boot.loader.WarLauncher;
          else echo 'IAM version '$$IAM_VERS' is not available'; fi
       "
@@ -68,7 +68,7 @@ services:
     environment: 
       TZ: Europe/Rome
       IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044 -Dspring.profiles.active=prod,registration
-      IAM_JAR: /code/iam-login-service/target/iam-login-service.war
+      IAM_JAVA_MEM_OPTS: -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
       DB_HOST: ${DB_HOSTNAME:-vnode-0.localdomain}
       IAM_VERS: ${IAM_VERSION:-v1.6.0}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
@@ -109,7 +109,6 @@ services:
     command: /bin/bash -c "
         envsubst '$${IAM_HOST}' < /etc/nginx/conf.d/mysite.template > /etc/nginx/conf.d/srm.conf
         && /wait-for-it.sh -t 0 $$IAM_HOST:443
-        && update-ca-trust
         && echo '# GEANT eScience Personal CA 4' | tee -a /etc/pki/tls/certs/ca-bundle.crt
         && cat /etc/grid-security/certificates/GEANTeSciencePersonalCA4.pem | tee -a /etc/pki/tls/certs/ca-bundle.crt
         && /home/build/local/openresty/nginx/sbin/nginx -g 'daemon off;'
@@ -133,7 +132,7 @@ services:
     hostname: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
     command: /bin/bash -c "
         /wait-for-it.sh -t 0 $$IAM_BE_HOST:8080
-        && java -XX:+UnlockExperimentalVMOptions -XX:+UseContainerSupport $$VOMS_NG_JAVA_OPTS -jar voms-aa.jar
+        && java -cp @/app/jib-classpath-file it.infn.mw.voms.VomsService
       "
 
     environment:
@@ -143,7 +142,6 @@ services:
       IAM_DB_HOST: ${MYSQL_DB:-db}
       IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
       IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
-      VOMS_NG_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044
     
     ports:
       - "9444:15000"
