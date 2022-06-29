@@ -9,7 +9,7 @@ pipeline {
     agent any
     
     stages {
-        stage('Update status on gitlab') {
+        stage('Initial update status on gitlab') {
             steps {
                 echo 'Notify GitLab'
                 updateGitlabCommitStatus name: 'build', state: 'pending'
@@ -42,7 +42,7 @@ pipeline {
                 sh "docker rmi $registry:$BUILD_NUMBER"
             }
         }
-        stage('Update status on gitlab') {
+        stage('Final update status on gitlab') {
             steps {
                 echo 'Notify GitLab'
                 updateGitlabCommitStatus name: 'build', state: 'success'
