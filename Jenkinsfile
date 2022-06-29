@@ -237,7 +237,7 @@ pipeline {
                         sh "docker rmi $iamImage:$BUILD_VERSION"
                         sh "docker rmi $nginxVomsImage:$BUILD_VERSION"
                         sh "docker rmi $vomsAAImage:$BUILD_VERSION"
-                        sh "docker rmi $$(docker images -f \"reference=indigoiam/*\" -q)"
+                        sh "docker rmi \$(docker images -f \"reference=indigoiam/*\" -q)"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'remove', state: 'failed'
                     }
