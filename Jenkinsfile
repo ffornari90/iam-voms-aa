@@ -17,12 +17,12 @@ pipeline {
         }
         stage('Cloning git') {
             steps {
-                try {
-                    withCredentials([gitUsernamePassword(credentialsId: 'baltig')]) {
+                withCredentials([gitUsernamePassword(credentialsId: 'baltig')]) {
+                    try {
                         sh "rm -rf iam-voms-aa; git clone https://baltig.infn.it/fornari/iam-voms-aa.git"
+                    } catch (e) {
+                        updateGitlabCommitStatus name: 'clone', state: 'failed'
                     }
-                } catch (e) {
-                    updateGitlabCommitStatus name: 'clone', state: 'failed'
                 }
             }
         }
@@ -39,13 +39,13 @@ pipeline {
         }
         stage('Deploy image') {
             steps {
-                try {
-                    withCredentials([usernamePassword(credentialsId: "$registryCredential", passwordVariable: 'Password', usernameVariable: 'User')]) {
+                withCredentials([usernamePassword(credentialsId: "$registryCredential", passwordVariable: 'Password', usernameVariable: 'User')]) {
+                    try {
                         sh "docker login -u ${env.User} -p ${env.Password}"
                         sh "docker push $registry:$BUILD_NUMBER"
+                    } catch (e) {
+                        updateGitlabCommitStatus name: 'push', state: 'failed'
                     }
-                } catch (e) {
-                    updateGitlabCommitStatus name: 'push', state: 'failed'
                 }
             }
         }
