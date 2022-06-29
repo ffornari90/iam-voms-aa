@@ -10,10 +10,10 @@ pipeline {
     
     stages {
         stage('Update status on gitlab') {
-          steps {
-             echo 'Notify GitLab'
-             updateGitlabCommitStatus name: 'build', state: 'pending'
-          }
+            steps {
+                echo 'Notify GitLab'
+                updateGitlabCommitStatus name: 'build', state: 'pending'
+            }
         }
         stage('Cloning git') {
             steps {
@@ -43,10 +43,10 @@ pipeline {
             }
         }
         stage('Update status on gitlab') {
-          steps {
-             echo 'Notify GitLab'
-             updateGitlabCommitStatus name: 'build', state: 'success'
-          }
+            steps {
+                echo 'Notify GitLab'
+                updateGitlabCommitStatus name: 'build', state: 'success'
+            }
         }        
     }
 }
