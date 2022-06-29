@@ -104,6 +104,20 @@ pipeline {
                 }
             }
         }
+        stage('Push docker-compose.yml to apache server') {
+            steps {
+                script {
+                    try {
+                        withCredentials([sshUserPrivateKey(credentialsId: "cloudApache", keyFileVariable: 'keyfile')]) {
+                            sh "scp -i ${keyfile} iam-voms-aa/compose/docker-compose.yml centos@131.154.97.87:iam-voms-aa.yml"
+                            sh "ssh -i ${keyfile} centos@131.154.97.87 sudo cp iam-voms-aa.yml /var/www/html/docker-compose/"
+                        }
+                    } catch (e) {
+                        updateGitlabCommitStatus name: 'scp', state: 'failed'
+                    }
+                }
+            }        
+        }
         stage('Final update status on gitlab') {
             steps {
                 echo 'Notify GitLab'
