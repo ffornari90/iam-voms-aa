@@ -9,6 +9,12 @@ pipeline {
     agent any
     
     stages {
+        stage('Update status on gitlab') {
+          steps {
+             echo 'Notify GitLab'
+             updateGitlabCommitStatus name: 'build', state: 'pending'
+          }
+        }
         stage('Cloning git') {
             steps {
                 withCredentials([gitUsernamePassword(credentialsId: 'baltig')]) {
@@ -36,5 +42,11 @@ pipeline {
                 sh "docker rmi $registry:$BUILD_NUMBER"
             }
         }
+        stage('Update status on gitlab') {
+          steps {
+             echo 'Notify GitLab'
+             updateGitlabCommitStatus name: 'build', state: 'success'
+          }
+        }        
     }
 }
