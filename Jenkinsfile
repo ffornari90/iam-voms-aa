@@ -12,7 +12,7 @@ pipeline {
         stage('Cloning git') {
             steps {
                 withCredentials([gitUsernamePassword(credentialsId: 'baltig')]) {
-                    sh 'git clone --branch main https://baltig.infn.it/fornari/iam-voms-aa.git'
+                    sh 'git clone https://baltig.infn.it/fornari/iam-voms-aa.git'
                 }
             }
         }
