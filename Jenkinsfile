@@ -1,5 +1,6 @@
 pipeline {
     environment {
+        iamBinariesImage = "ffornari/iam-binaries"
         trustImage = "ffornari/trustanchors"
         hostcertImage = "ffornari/hostcert"
         iamBEImage = "ffornari/iam-login-service"
@@ -55,6 +56,7 @@ pipeline {
             steps {
                 script {
                     try {
+                        sh "docker build -f iam-voms-aa/iam-binaries/Dockerfile -t $iamBinariesImage:$BUILD_VERSION iam-voms-aa/iam-binaries"
                         sh "docker build -f iam-voms-aa/trust/Dockerfile -t $trustImage:$BUILD_VERSION iam-voms-aa/trust"
                         sh "docker build -f iam-voms-aa/hostcert/Dockerfile -t $hostcertImage:$BUILD_VERSION iam-voms-aa/hostcert"
                         sh "docker build -f iam-voms-aa/iam-be/$IAM_VERSION1/Dockerfile -t $iamBEImage:$IAM_VERSION1 iam-voms-aa/iam-be/$IAM_VERSION1"
@@ -87,6 +89,7 @@ pipeline {
             steps {
                 script {
                     try {
+                        sh "docker push $iamBinariesImage:$BUILD_VERSION"
                         sh "docker push $trustImage:$BUILD_VERSION"
                         sh "docker push $hostcertImage:$BUILD_VERSION"
                         sh "docker push $iamBEImage:$IAM_VERSION1"
@@ -106,6 +109,7 @@ pipeline {
             steps {
                 script {
                     try {
+                        sh "docker rmi $iamBinariesImage:$BUILD_VERSION"
                         sh "docker rmi $trustImage:$BUILD_VERSION"
                         sh "docker rmi $hostcertImage:$BUILD_VERSION"
                         sh "docker rmi $iamBEImage:$IAM_VERSION1"
