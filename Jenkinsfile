@@ -6,6 +6,7 @@ pipeline {
         iamImage = "ffornari/nginx"
         nginxVomsImage = "ffornari/ngx-voms"
         vomsAAImage = "ffornari/voms-aa"
+        vomsClientImage = "ffornari/voms-client"
         registryCredential = 'dockerhub'
         gitCredential = 'baltig'
         BUILD_VERSION = "latest"
@@ -62,6 +63,7 @@ pipeline {
                         sh "docker build -f iam-voms-aa/iam/Dockerfile -t $iamImage:$BUILD_VERSION iam-voms-aa/iam"
                         sh "docker build -f iam-voms-aa/nginx-voms/Dockerfile -t $nginxVomsImage:$BUILD_VERSION iam-voms-aa/nginx-voms"
                         sh "docker build -f iam-voms-aa/vomsng/Dockerfile -t $vomsAAImage:$BUILD_VERSION iam-voms-aa/vomsng"
+                        sh "docker build -f iam-voms-aa/voms-client/Dockerfile -t $vomsClientImage:$BUILD_VERSION iam-voms-aa/voms-client"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'build', state: 'failed'
                     }
@@ -93,6 +95,7 @@ pipeline {
                         sh "docker push $iamImage:$BUILD_VERSION"
                         sh "docker push $nginxVomsImage:$BUILD_VERSION"
                         sh "docker push $vomsAAImage:$BUILD_VERSION"
+                        sh "docker push $vomsClientImage:$BUILD_VERSION"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'push', state: 'failed'
                     }
@@ -111,6 +114,7 @@ pipeline {
                         sh "docker rmi $iamImage:$BUILD_VERSION"
                         sh "docker rmi $nginxVomsImage:$BUILD_VERSION"
                         sh "docker rmi $vomsAAImage:$BUILD_VERSION"
+                        sh "docker rmi $vomsClientImage:$BUILD_VERSION"
                         sh "docker rmi \$(docker images -f \"reference=indigoiam/*\" -q)"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'remove', state: 'failed'
