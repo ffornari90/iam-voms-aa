@@ -5,10 +5,10 @@ The VOMS Attribute Authority can access the IAM database and encode IAM groups a
 
 # Docker Compose file
 
-The architecture of IAM with VOMS-AA embedded in [docker-compose.yml](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/compose/docker-compose.yml) has been realized starting from the INDIGO IAM official [VOMS-AA Docker Compose file](https://github.com/indigo-iam/voms-aa/blob/master/compose/docker-compose.yml) and is meant to automatize services instantiation using INFN Cloud Docker Compose deployment functionality.
+The architecture of IAM with VOMS-AA embedded in [docker-compose.yml](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/compose/docker-compose.yml) has been realized starting from the INDIGO IAM official [VOMS-AA Docker Compose file](https://github.com/indigo-iam/voms-aa/blob/master/compose/docker-compose.yml) and is meant to automatize services instantiation using INFN Cloud Docker Compose deployment functionality.  
 Here is a scheme illustrating the architecture of the principal services.
 
-![IAM VOMS-AA Deployment Scheme](pictures/iam-voms-aa.png?raw=true "IAM VOMS-AA Deployment Scheme")
+<img src="pictures/iam-voms-aa.png?raw=true" width="500"/>
 
 A description of the role played by each Docker Compose service is reported hereafter:
 
@@ -27,13 +27,9 @@ The correct start timing for those services that rely on other services is manag
 Deployment procedure on INFN Cloud
 -----------
 
-Connect to the [INFN-CLOUD dashboard](https://my.cloud.infn.it/).
+Connect to the [INFN-CLOUD dashboard](https://my.cloud.infn.it/). Authenticate with the credentials used for the [INFN-CLOUD IAM](https://iam.cloud.infn.it/login) account in order to access the dashboard.
 
-![INFN-CLOUD dashboard](pictures/infn_cloud_new_dashb.png?raw=true "INFN-CLOUD dashboard")
-
-Authenticate with the credentials used for the [INFN-CLOUD IAM](https://iam.cloud.infn.it/login) account in order to access the dashboard.
-
-![INFN-CLOUD IAM login](pictures/infn_cloud_iam_login.png?raw=true "INFN-CLOUD IAM login")
+<img src="pictures/infn_cloud_new_dashb.png?raw=true" width="675"/> | <img src="pictures/infn_cloud_iam_login.png?raw=true" width="275"/>
 
 After login into the dashboard, select the `Docker-compose` card in the service catalog and click on the Configure button.
 
@@ -91,7 +87,7 @@ When the deployment is completed, the public IP of the freshly instantiated VM c
 ![INFN-CLOUD Output Values](pictures/infn_cloud_output_values.png?raw=true "INFN-CLOUD Output Values")
 
 In order for the client to properly contact the IAM server, this public IP must be mapped on the server FQDN in the `/etc/hosts` client file.
-A Docker image to deploy a container providing VOMS client CLI with LSC and VOMSES files properly configured for a VO named `test.vo` is available at `ffornari/voms-client` on Docker Hub.
+A Docker image to deploy a container providing VOMS client CLI with LSC and VOMSES files properly configured for a VO named `test.vo` is available at [ffornari/voms-client](https://hub.docker.com/repository/docker/ffornari/voms-client) on Docker Hub.
 
 
 
