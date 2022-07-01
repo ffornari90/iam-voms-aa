@@ -1,6 +1,4 @@
 FROM centos:7
-COPY ./assets/certs/hostkey.pem /etc/ssl/certs/
-COPY ./assets/certs/hostcert.pem /etc/ssl/certs/
 COPY ./assets/scripts/wait-for-it.sh /
 RUN yum install -y epel-release && \
     yum clean all && \

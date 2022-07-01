@@ -28,14 +28,21 @@ services:
     hostname: hostcert
     links:
       - "trust:trust"
+
     command: /bin/bash -c "
-        /opt/bin/wait-for-it.sh -t 0 trust:8086
+        echo $$HOST_PRIVATE_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem
+        && curl \"$${HOST_CERT_URL}\" -o /etc/ssl/certs/hostcert.pem
+        && /opt/bin/wait-for-it.sh -t 0 trust:8086
         && cp /etc/grid-security/certificates/*.pem /etc/pki/ca-trust/source/anchors/
         && update-ca-trust
         && echo '# GEANT eScience Personal CA 4' | tee -a /etc/pki/tls/certs/ca-bundle.crt
         && cat /etc/grid-security/certificates/GEANTeSciencePersonalCA4.pem | tee -a /etc/pki/tls/certs/ca-bundle.crt
         && nc -l 8085
       "
+
+    environment:
+      HOST_PRIVATE_KEY: ${IAM_HOST_KEY}
+      HOST_CERT_URL: ${IAM_HOST_CERT}
 
     volumes:
       - trustanchors:/etc/grid-security/certificates
@@ -172,7 +179,7 @@ services:
     hostname: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
     links:
       - "iam-be:iam-be"
-      - "db:db"
+
     entrypoint:
       /bin/sh -c "
         cp /opt/bin/application.yml /app/resources/
@@ -197,4 +204,3 @@ services:
 
     depends_on:
       - sidecar
-

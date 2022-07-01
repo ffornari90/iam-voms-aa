@@ -3,17 +3,10 @@ pipeline {
         iamBinariesImage = "ffornari/iam-binaries"
         trustImage = "ffornari/trustanchors"
         hostcertImage = "ffornari/hostcert"
-        iamBEImage = "ffornari/iam-login-service"
-        iamImage = "ffornari/nginx"
-        nginxVomsImage = "ffornari/ngx-voms"
-        vomsAAImage = "ffornari/voms-aa"
         vomsClientImage = "ffornari/voms-client"
         registryCredential = 'dockerhub'
         gitCredential = 'baltig'
         BUILD_VERSION = "latest"
-        IAM_VERSION1 = "v1.6.0"
-        IAM_VERSION2 = "v1.7.2"
-        IAM_VERSION3 = "v1.8.0"
     }
     
     agent any
@@ -59,12 +52,6 @@ pipeline {
                         sh "docker build -f iam-voms-aa/iam-binaries/Dockerfile -t $iamBinariesImage:$BUILD_VERSION iam-voms-aa/iam-binaries"
                         sh "docker build -f iam-voms-aa/trust/Dockerfile -t $trustImage:$BUILD_VERSION iam-voms-aa/trust"
                         sh "docker build -f iam-voms-aa/hostcert/Dockerfile -t $hostcertImage:$BUILD_VERSION iam-voms-aa/hostcert"
-                        sh "docker build -f iam-voms-aa/iam-be/$IAM_VERSION1/Dockerfile -t $iamBEImage:$IAM_VERSION1 iam-voms-aa/iam-be/$IAM_VERSION1"
-                        sh "docker build -f iam-voms-aa/iam-be/$IAM_VERSION2/Dockerfile -t $iamBEImage:$IAM_VERSION2 iam-voms-aa/iam-be/$IAM_VERSION2"
-                        sh "docker build -f iam-voms-aa/iam-be/$IAM_VERSION3/Dockerfile -t $iamBEImage:$IAM_VERSION3 iam-voms-aa/iam-be/$IAM_VERSION3"
-                        sh "docker build -f iam-voms-aa/iam/Dockerfile -t $iamImage:$BUILD_VERSION iam-voms-aa/iam"
-                        sh "docker build -f iam-voms-aa/nginx-voms/Dockerfile -t $nginxVomsImage:$BUILD_VERSION iam-voms-aa/nginx-voms"
-                        sh "docker build -f iam-voms-aa/vomsng/Dockerfile -t $vomsAAImage:$BUILD_VERSION iam-voms-aa/vomsng"
                         sh "docker build -f iam-voms-aa/voms-client/Dockerfile -t $vomsClientImage:$BUILD_VERSION iam-voms-aa/voms-client"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'build', state: 'failed'
@@ -92,12 +79,6 @@ pipeline {
                         sh "docker push $iamBinariesImage:$BUILD_VERSION"
                         sh "docker push $trustImage:$BUILD_VERSION"
                         sh "docker push $hostcertImage:$BUILD_VERSION"
-                        sh "docker push $iamBEImage:$IAM_VERSION1"
-                        sh "docker push $iamBEImage:$IAM_VERSION2"
-                        sh "docker push $iamBEImage:$IAM_VERSION3"
-                        sh "docker push $iamImage:$BUILD_VERSION"
-                        sh "docker push $nginxVomsImage:$BUILD_VERSION"
-                        sh "docker push $vomsAAImage:$BUILD_VERSION"
                         sh "docker push $vomsClientImage:$BUILD_VERSION"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'push', state: 'failed'
@@ -112,12 +93,6 @@ pipeline {
                         sh "docker rmi $iamBinariesImage:$BUILD_VERSION"
                         sh "docker rmi $trustImage:$BUILD_VERSION"
                         sh "docker rmi $hostcertImage:$BUILD_VERSION"
-                        sh "docker rmi $iamBEImage:$IAM_VERSION1"
-                        sh "docker rmi $iamBEImage:$IAM_VERSION2"
-                        sh "docker rmi $iamBEImage:$IAM_VERSION3"
-                        sh "docker rmi $iamImage:$BUILD_VERSION"
-                        sh "docker rmi $nginxVomsImage:$BUILD_VERSION"
-                        sh "docker rmi $vomsAAImage:$BUILD_VERSION"
                         sh "docker rmi $vomsClientImage:$BUILD_VERSION"
                         sh "docker rmi \$(docker images -f \"reference=indigoiam/*\" -q)"
                     } catch (e) {
