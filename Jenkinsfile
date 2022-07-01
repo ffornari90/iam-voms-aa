@@ -94,7 +94,6 @@ pipeline {
                         sh "docker rmi $trustImage:$BUILD_VERSION"
                         sh "docker rmi $hostcertImage:$BUILD_VERSION"
                         sh "docker rmi $vomsClientImage:$BUILD_VERSION"
-                        sh "docker rmi \$(docker images -f \"reference=indigoiam/*\" -q)"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'remove', state: 'failed'
                     }
