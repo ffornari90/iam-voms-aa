@@ -5,15 +5,14 @@ volumes:
   trustanchors:
   cabundle:
   certs:
-  binaries:
+  files:
 
 services:
   sidecar:
-    image: ffornari/iam-binaries:latest
+    image: ffornari/sidecar:latest
     container_name: sidecar
-
     volumes:
-      - binaries:/opt/bin
+      - files:/files
 
   trust:
     image: ffornari/trustanchors:latest
@@ -30,9 +29,9 @@ services:
       - "trust:trust"
 
     command: /bin/bash -c "
-        echo $$HOST_PRIVATE_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem
+        echo $$HOST_PRIV_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem
         && curl \"$${HOST_CERT_URL}\" -o /etc/ssl/certs/hostcert.pem
-        && /opt/bin/wait-for-it.sh -t 0 trust:8086
+        && /files/wait-for-it.sh -t 0 trust:8086
         && cp /etc/grid-security/certificates/*.pem /etc/pki/ca-trust/source/anchors/
         && update-ca-trust
         && echo '# GEANT eScience Personal CA 4' | tee -a /etc/pki/tls/certs/ca-bundle.crt
@@ -41,14 +40,14 @@ services:
       "
 
     environment:
-      HOST_PRIVATE_KEY: ${IAM_HOST_KEY}
-      HOST_CERT_URL: ${IAM_HOST_CERT}
+      HOST_PRIV_KEY: ${IAM_PRIV_KEY}
+      HOST_CERT_URL: ${IAM_CERT_URL}
 
     volumes:
       - trustanchors:/etc/grid-security/certificates
       - cabundle:/etc/pki
       - certs:/etc/ssl/certs
-      - binaries:/opt/bin
+      - files:/files
 
     depends_on:
       - sidecar
@@ -75,7 +74,7 @@ services:
       - "db:db"
 
     command: /bin/bash -c "
-        /opt/bin/wait-for-it.sh -t 0 db:3306
+        /files/wait-for-it.sh -t 0 db:3306
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then java $$IAM_JAVA_OPTS org.springframework.boot.loader.WarLauncher;
@@ -97,7 +96,7 @@ services:
       IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
   
     volumes:
-      - binaries:/opt/bin
+      - files:/files
 
     depends_on:
       - sidecar
@@ -121,15 +120,15 @@ services:
     command: /bin/bash -c "
         cp /certs/hostcert.pem /etc/ssl/certs/iam.cert.pem
         && cp /certs/hostkey.pem /etc/ssl/private/iam.key.pem
-        && /opt/bin/wait-for-it.sh -t 0 hostcert:8085
-        && /opt/bin/wait-for-it.sh -t 0 iam-be:8080
-        && /opt/bin/wait-for-it.sh -t 0 client:8080
+        && /files/wait-for-it.sh -t 0 hostcert:8085
+        && /files/wait-for-it.sh -t 0 iam-be:8080
+        && /files/wait-for-it.sh -t 0 client:8080
         && nginx -g 'daemon off;'
       "
 
     volumes:
       - certs:/certs
-      - binaries:/opt/bin
+      - files:/files
 
     environment:
       TZ: Europe/Rome
@@ -149,10 +148,10 @@ services:
       - "vomsng:vomsng"
 
     command: /bin/bash -c "
-        cp /opt/bin/nginx.conf /home/build/local/openresty/nginx/conf/
-        && cp /opt/bin/voms-ng.conf /etc/nginx/conf.d/voms-ng.template
+        cp /files/nginx.conf /home/build/local/openresty/nginx/conf/
+        && cp /files/voms-ng.conf /etc/nginx/conf.d/voms-ng.template
         && envsubst '$${IAM_HOST}' < /etc/nginx/conf.d/voms-ng.template > /etc/nginx/conf.d/srm.conf
-        && /opt/bin/wait-for-it.sh -t 0 iam:443
+        && /files/wait-for-it.sh -t 0 iam:443
         && /home/build/local/openresty/nginx/sbin/nginx -g 'daemon off;'
       "
 
@@ -169,7 +168,7 @@ services:
       - cabundle:/etc/pki
       - trustanchors:/etc/grid-security/certificates
       - certs:/certs
-      - binaries:/opt/bin
+      - files:/files
       
     depends_on:
       - sidecar
@@ -182,8 +181,8 @@ services:
 
     entrypoint:
       /bin/sh -c "
-        cp /opt/bin/application.yml /app/resources/
-        && /opt/bin/wait-for-it.sh -t 0 iam-be:8080
+        cp /files/application.yml /app/resources/
+        && /files/wait-for-it.sh -t 0 iam-be:8080
         && java -cp @/app/jib-classpath-file it.infn.mw.voms.VomsService
       "
 
@@ -194,13 +193,10 @@ services:
       IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
       IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
     
-    ports:
-      - "9444:15000"
-
     volumes:
       - certs:/etc/grid-security/voms
       - trustanchors:/etc/grid-security/certificates
-      - binaries:/opt/bin
+      - files:/files
 
     depends_on:
       - sidecar

@@ -1,6 +1,6 @@
 pipeline {
     environment {
-        iamBinariesImage = "ffornari/iam-binaries"
+        sidecarImage = "ffornari/sidecar"
         trustImage = "ffornari/trustanchors"
         hostcertImage = "ffornari/hostcert"
         vomsClientImage = "ffornari/voms-client"
@@ -49,7 +49,7 @@ pipeline {
             steps {
                 script {
                     try {
-                        sh "docker build -f iam-voms-aa/iam-binaries/Dockerfile -t $iamBinariesImage:$BUILD_VERSION iam-voms-aa/iam-binaries"
+                        sh "docker build -f iam-voms-aa/sidecar/Dockerfile -t $sidecarImage:$BUILD_VERSION iam-voms-aa/sidecar"
                         sh "docker build -f iam-voms-aa/trust/Dockerfile -t $trustImage:$BUILD_VERSION iam-voms-aa/trust"
                         sh "docker build -f iam-voms-aa/hostcert/Dockerfile -t $hostcertImage:$BUILD_VERSION iam-voms-aa/hostcert"
                         sh "docker build -f iam-voms-aa/voms-client/Dockerfile -t $vomsClientImage:$BUILD_VERSION iam-voms-aa/voms-client"
@@ -76,7 +76,7 @@ pipeline {
             steps {
                 script {
                     try {
-                        sh "docker push $iamBinariesImage:$BUILD_VERSION"
+                        sh "docker push $sidecarImage:$BUILD_VERSION"
                         sh "docker push $trustImage:$BUILD_VERSION"
                         sh "docker push $hostcertImage:$BUILD_VERSION"
                         sh "docker push $vomsClientImage:$BUILD_VERSION"
@@ -90,7 +90,7 @@ pipeline {
             steps {
                 script {
                     try {
-                        sh "docker rmi $iamBinariesImage:$BUILD_VERSION"
+                        sh "docker rmi $sidecarImage:$BUILD_VERSION"
                         sh "docker rmi $trustImage:$BUILD_VERSION"
                         sh "docker rmi $hostcertImage:$BUILD_VERSION"
                         sh "docker rmi $vomsClientImage:$BUILD_VERSION"
