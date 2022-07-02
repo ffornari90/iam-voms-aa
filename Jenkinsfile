@@ -49,7 +49,7 @@ pipeline {
                 script {
                     try {
                         sh "docker build -f iam-voms-aa/sidecar/Dockerfile -t $sidecarImage:$BUILD_VERSION iam-voms-aa/sidecar"
-                        sh "docker build -f iam-voms-aa/voms-client/Dockerfile -t $vomsClientImage:$BUILD_VERSION iam-voms-aa/voms-client"
+                        sh "cd iam-voms-aa; ./scripts/build-voms-client.sh"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'build', state: 'failed'
                     }

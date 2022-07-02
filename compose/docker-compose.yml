@@ -218,7 +218,7 @@ services:
       - sidecar
 
   voms-client:
-    image: ffornari/voms-client:latest
+    image: centos:7
     container_name: voms-client
     hostname: voms-client
     links:
@@ -229,8 +229,8 @@ services:
 
     command: /bin/sh -c "
         /files/wait-for-it.sh -t 0 nginx-voms:15000
-        && mkdir -p /vomsdir/$$VO /etc/vomses
-        && cp /files/$$IAM_HOST.lsc /vomsdir/$$VO/
+        && mkdir -p /etc/grid-security/vomsdir/$$VO /etc/vomses
+        && cp /files/$$IAM_HOST.lsc /etc/grid-security/vomsdir/$$VO/
         && cp /files/$$VO /etc/vomses/
         && sleep infinity
       "
