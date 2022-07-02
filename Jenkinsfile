@@ -2,8 +2,6 @@ pipeline {
     environment {
         cloudApacheIP = "131.154.97.87"
         sidecarImage = "ffornari/sidecar"
-        trustImage = "ffornari/trustanchors"
-        hostcertImage = "ffornari/hostcert"
         vomsClientImage = "ffornari/voms-client"
         registryCredential = 'dockerhub'
         gitCredential = 'baltig'
@@ -51,8 +49,6 @@ pipeline {
                 script {
                     try {
                         sh "docker build -f iam-voms-aa/sidecar/Dockerfile -t $sidecarImage:$BUILD_VERSION iam-voms-aa/sidecar"
-                        sh "docker build -f iam-voms-aa/trust/Dockerfile -t $trustImage:$BUILD_VERSION iam-voms-aa/trust"
-                        sh "docker build -f iam-voms-aa/hostcert/Dockerfile -t $hostcertImage:$BUILD_VERSION iam-voms-aa/hostcert"
                         sh "docker build -f iam-voms-aa/voms-client/Dockerfile -t $vomsClientImage:$BUILD_VERSION iam-voms-aa/voms-client"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'build', state: 'failed'
@@ -78,8 +74,6 @@ pipeline {
                 script {
                     try {
                         sh "docker push $sidecarImage:$BUILD_VERSION"
-                        sh "docker push $trustImage:$BUILD_VERSION"
-                        sh "docker push $hostcertImage:$BUILD_VERSION"
                         sh "docker push $vomsClientImage:$BUILD_VERSION"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'push', state: 'failed'
@@ -92,8 +86,6 @@ pipeline {
                 script {
                     try {
                         sh "docker rmi $sidecarImage:$BUILD_VERSION"
-                        sh "docker rmi $trustImage:$BUILD_VERSION"
-                        sh "docker rmi $hostcertImage:$BUILD_VERSION"
                         sh "docker rmi $vomsClientImage:$BUILD_VERSION"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'remove', state: 'failed'

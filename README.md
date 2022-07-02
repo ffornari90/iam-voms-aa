@@ -56,7 +56,7 @@ Environment variables that contain the *server certificate* and *private key* ar
 Here is a list of the principal variables that can/**must** be set:
 
 * `IAM_PRIV_KEY` **must** be filled with the base64 encoded content of the IAM server private key file.
-* `IAM_CERT_URL` **must** be filled with the URL provided by [Sectigo](https://www.sectigostore.com/sectigo) to download the requested server certificate. 
+* `IAM_CERT_URL` **must** be filled with the URL provided by [Sectigo](https://www.sectigostore.com) to download the requested server certificate. 
 * `IAM_FQDN` **must** be set to the IAM server name contained in the server certificate.
 * `IAM_VERSION` can be set to the preferred IAM release for the services to be installed (default is `v1.6.0`).
 * `MYSQL_DB` can be set to a custom value (default is `db`).

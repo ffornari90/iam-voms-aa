@@ -11,31 +11,33 @@ services:
   sidecar:
     image: ffornari/sidecar:latest
     container_name: sidecar
+    command: /bin/sh -c "
+        cp /wait-for-it.sh /files
+        && cp /voms-ng.conf /files
+        && cp /application.yml /files
+        && curl \"$${HOST_CERT_URL}\" -o /hostcert.pem
+        && export HOST_CERT_SUBJECT=$$(openssl x509 -in /hostcert.pem -noout -subject | awk -F\"subject= \" '{print $$2}')
+        && export HOST_CERT_ISSUER=$$(openssl x509 -in /hostcert.pem -noout -issuer | awk -F\"issuer= \" '{print $$2}')
+        && envsubst '$${VO},$${IAM_HOST},$${HOST_CERT_SUBJECT}' < /vomses.template > /files/$$VO
+        && envsubst '$${HOST_CERT_SUBJECT},$${HOST_CERT_ISSUER}' < /lsc.template > /files/$$IAM_HOST.lsc
+        && sleep infinity
+      "
+
     volumes:
       - files:/files
 
-  trust:
-    image: ffornari/trustanchors:latest
-    container_name: trust
-    hostname: trust
-    volumes:
-      - trustanchors:/etc/grid-security/certificates
+    environment:
+      VO: ${VO_NAME:-test.vo}
+      HOST_CERT_URL: ${IAM_CERT_URL}
+      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
       
   hostcert:
-    image: ffornari/hostcert:latest
+    image: centos:7
     container_name: hostcert
     hostname: hostcert
-    links:
-      - "trust:trust"
-
-    command: /bin/bash -c "
+    command: /bin/sh -c "
         echo $$HOST_PRIV_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem
         && curl \"$${HOST_CERT_URL}\" -o /etc/ssl/certs/hostcert.pem
-        && /files/wait-for-it.sh -t 0 trust:8086
-        && cp /etc/grid-security/certificates/*.pem /etc/pki/ca-trust/source/anchors/
-        && update-ca-trust
-        && echo '# GEANT eScience Personal CA 4' | tee -a /etc/pki/tls/certs/ca-bundle.crt
-        && cat /etc/grid-security/certificates/GEANTeSciencePersonalCA4.pem | tee -a /etc/pki/tls/certs/ca-bundle.crt
         && nc -l 8085
       "
 
@@ -44,13 +46,25 @@ services:
       HOST_CERT_URL: ${IAM_CERT_URL}
 
     volumes:
+      - certs:/etc/ssl/certs
+
+  trust:
+    image: indigoiam/egi-trustanchors:latest
+    container_name: trust
+    hostname: trust
+    entrypoint:
+       /bin/sh -c "
+         yum install -y netcat
+         && /update-trust-anchors.sh
+         && nc -l 8086
+       "
+
+    environment:
+      FORCE_TRUST_ANCHORS_UPDATE: 1
+
+    volumes:
       - trustanchors:/etc/grid-security/certificates
       - cabundle:/etc/pki
-      - certs:/etc/ssl/certs
-      - files:/files
-
-    depends_on:
-      - sidecar
 
   db:
     container_name: db
@@ -73,7 +87,7 @@ services:
     links:
       - "db:db"
 
-    command: /bin/bash -c "
+    command: /bin/sh -c "
         /files/wait-for-it.sh -t 0 db:3306
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
@@ -87,8 +101,8 @@ services:
       IAM_JAVA_MEM_OPTS: -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
       IAM_VERS: ${IAM_VERSION:-v1.6.0}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-      IAM_BASE_URL: ${IAM_URL:-https://iam-indigo.cr.cnaf.infn.it}
-      IAM_ISSUER: ${IAM_ISSUER:-https://iam-indigo.cr.cnaf.infn.it}
+      IAM_BASE_URL: ${IAM_URL:-https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}}
+      IAM_ISSUER: ${IAM_ISSUER:-https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}}
       IAM_USE_FORWARDED_HEADERS: "true"
       IAM_NOTIFICATION_DISABLE: "true"
       IAM_DB_HOST: ${MYSQL_DB:-db}
@@ -108,18 +122,20 @@ services:
     environment:
       IAM_CLIENT_PORT: 8080
     
-  iam:
+  nginx-iam:
     image: indigoiam/nginx:latest
-    container_name: iam
-    hostname: iam
+    container_name: nginx-iam
+    hostname: nginx-iam
     links:
+      - "trust:trust"
       - "hostcert:hostcert"
       - "iam-be:iam-be"
       - "client:client"
 
-    command: /bin/bash -c "
+    command: /bin/sh -c "
         cp /certs/hostcert.pem /etc/ssl/certs/iam.cert.pem
         && cp /certs/hostkey.pem /etc/ssl/private/iam.key.pem
+        && /files/wait-for-it.sh -t 0 trust:8086
         && /files/wait-for-it.sh -t 0 hostcert:8085
         && /files/wait-for-it.sh -t 0 iam-be:8080
         && /files/wait-for-it.sh -t 0 client:8080
@@ -140,49 +156,17 @@ services:
     depends_on:
       - sidecar
 
-  nginx-voms:
-    image: storm2/ngx-voms:latest
-    container_name: nginx-voms
-    links:
-      - "iam:iam"
-      - "vomsng:vomsng"
-
-    command: /bin/bash -c "
-        cp /files/nginx.conf /home/build/local/openresty/nginx/conf/
-        && cp /files/voms-ng.conf /etc/nginx/conf.d/voms-ng.template
-        && envsubst '$${IAM_HOST}' < /etc/nginx/conf.d/voms-ng.template > /etc/nginx/conf.d/srm.conf
-        && /files/wait-for-it.sh -t 0 iam:443
-        && /home/build/local/openresty/nginx/sbin/nginx -g 'daemon off;'
-      "
-
-    ports:
-      - "15000:443"
-
-    environment:
-      TZ: UTC
-      X509_VOMS_DIR: /vomsdir
-      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-      
-
-    volumes:
-      - cabundle:/etc/pki
-      - trustanchors:/etc/grid-security/certificates
-      - certs:/certs
-      - files:/files
-      
-    depends_on:
-      - sidecar
-
-  vomsng:
+  voms-aa:
     image: indigoiam/voms-aa:latest
+    container_name: voms-aa
     hostname: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
     links:
-      - "iam-be:iam-be"
+      - "nginx-iam:nginx-iam"
 
     entrypoint:
       /bin/sh -c "
         cp /files/application.yml /app/resources/
-        && /files/wait-for-it.sh -t 0 iam-be:8080
+        && /files/wait-for-it.sh -t 0 nginx-iam:443
         && java -cp @/app/jib-classpath-file it.infn.mw.voms.VomsService
       "
 
@@ -195,6 +179,69 @@ services:
     
     volumes:
       - certs:/etc/grid-security/voms
+      - trustanchors:/etc/grid-security/certificates
+      - files:/files
+
+    depends_on:
+      - sidecar
+
+  nginx-voms:
+    image: indigoiam/openresty-voms:latest
+    container_name: nginx-voms
+    links:
+      - "voms-aa:voms-aa"
+
+    command: /bin/sh -c "
+        mkdir -p /vomsdir/$$VO
+        && cp /files/$$IAM_HOST.lsc /vomsdir/$$VO/
+        && envsubst '$${IAM_HOST}' < /files/voms-ng.conf > /etc/nginx/conf.d/voms-ng.conf
+        && /files/wait-for-it.sh -t 0 voms-aa:15000
+        && /usr/local/openresty-voms/nginx/sbin/nginx -g 'daemon off;'
+      "
+
+    ports:
+      - "15000:443"
+
+    environment:
+      TZ: Europe/Rome
+      VO: ${VO_NAME:-test.vo}
+      X509_VOMS_DIR: /vomsdir
+      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}      
+
+    volumes:
+      - cabundle:/etc/pki
+      - trustanchors:/etc/grid-security/certificates
+      - certs:/certs
+      - files:/files
+      
+    depends_on:
+      - sidecar
+
+  voms-client:
+    image: ffornari/voms-client:latest
+    container_name: voms-client
+    hostname: voms-client
+    links:
+      - "nginx-voms:nginx-voms"
+
+    extra_hosts:
+      - "${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}:host-gateway"
+
+    command: /bin/sh -c "
+        /files/wait-for-it.sh -t 0 nginx-voms:15000
+        && mkdir -p /vomsdir/$$VO /etc/vomses
+        && cp /files/$$IAM_HOST.lsc /vomsdir/$$VO/
+        && cp /files/$$VO /etc/vomses/
+        && sleep infinity
+      "
+
+    environment:
+      TZ: Europe/Rome
+      VO: ${VO_NAME:-test.vo}
+      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
+
+    volumes:
+      - cabundle:/etc/pki
       - trustanchors:/etc/grid-security/certificates
       - files:/files
 

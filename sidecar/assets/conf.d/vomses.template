@@ -1,0 +1,1 @@
+"${VO}" "${IAM_HOST}" "15000" "${HOST_CERT_SUBJECT}" "${VO}"
