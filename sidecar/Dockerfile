@@ -7,7 +7,7 @@ COPY ./assets/conf.d/application.yml /
 RUN yum install -y epel-release && \
     yum clean all && \
     rm -rf /var/cache/yum && \
-    yum install -y openssl && \
+    yum install -y openssl gettext && \
     yum clean all && \
     rm -rf /var/cache/yum && \
     chmod +x /wait-for-it.sh
