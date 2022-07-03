@@ -2,7 +2,7 @@ pipeline {
     environment {
         cloudApacheIP = "131.154.97.87"
         sidecarImage = "ffornari/sidecar"
-        vomsClientImage = "ffornari/voms-client"
+        opensslImage = "ffornari/openssl"
         registryCredential = 'dockerhub'
         gitCredential = 'baltig'
         BUILD_VERSION = "latest"
@@ -49,7 +49,7 @@ pipeline {
                 script {
                     try {
                         sh "docker build -f iam-voms-aa/sidecar/Dockerfile -t $sidecarImage:$BUILD_VERSION iam-voms-aa/sidecar"
-                        sh "cd iam-voms-aa; ./scripts/build-voms-client.sh"
+                        sh "docker build -f iam-voms-aa/openssl/Dockerfile -t $opensslImage:$BUILD_VERSION iam-voms-aa/sidecar"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'build', state: 'failed'
                     }
@@ -74,7 +74,7 @@ pipeline {
                 script {
                     try {
                         sh "docker push $sidecarImage:$BUILD_VERSION"
-                        sh "docker push $vomsClientImage:$BUILD_VERSION"
+                        sh "docker push $opensslImage:$BUILD_VERSION"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'push', state: 'failed'
                     }
@@ -86,7 +86,7 @@ pipeline {
                 script {
                     try {
                         sh "docker rmi $sidecarImage:$BUILD_VERSION"
-                        sh "docker rmi $vomsClientImage:$BUILD_VERSION"
+                        sh "docker rmi $opensslImage:$BUILD_VERSION"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'remove', state: 'failed'
                     }
