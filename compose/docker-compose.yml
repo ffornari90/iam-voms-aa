@@ -17,7 +17,7 @@ services:
         && curl \"$${HOST_CERT_URL}\" -o /hostcert.pem
         && export HOST_CERT_SUBJECT=$$(openssl x509 -in /hostcert.pem -noout -subject | awk -F\"subject= \" '{print $$2}')
         && export HOST_CERT_ISSUER=$$(openssl x509 -in /hostcert.pem -noout -issuer | awk -F\"issuer= \" '{print $$2}')
-        && envsubst '$${VO},$${IAM_HOST}' < /voms-ng.conf > /files/voms-ng.conf
+        && envsubst '$${IAM_HOST}' < /voms-ng.conf > /files/voms-ng.conf
         && envsubst '$${VO},$${IAM_HOST},$${HOST_CERT_SUBJECT}' < /vomses.template > /files/$$VO
         && envsubst '$${HOST_CERT_SUBJECT},$${HOST_CERT_ISSUER}' < /lsc.template > /files/$$IAM_HOST.lsc
         && sleep infinity
@@ -179,6 +179,7 @@ services:
 
     environment:
       TZ: Europe/Rome
+      VO: ${VO_NAME:-test.vo}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
       IAM_DB_HOST: ${MYSQL_DB:-db}
       IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
