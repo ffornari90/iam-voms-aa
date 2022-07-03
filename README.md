@@ -12,8 +12,8 @@ Here is a scheme illustrating the architecture of the principal services.
 
 A description of the role played by each Docker Compose service is reported hereafter:
 
-* `sidecar`: an Alpine utility container providing a volume that contains configuration files and scripts useful to other containers.
-* `trustanchors`: a CENTOS 7 utility container that contains fetch-crl and other utilities to provide up-to-date trust anchors to relying applications.
+* `sidecar`: a CENTOS 7 utility container providing a volume that contains configuration files and scripts useful to other containers.
+* `trust`: a CENTOS 7 utility container that contains fetch-crl and other utilities to provide up-to-date trust anchors to relying applications.
 * `hostcert`: a CENTOS 7 utility container that provides a server certificate and private key to relying applications.
 * `db`: a MySQL container starting a database where IAM will securely store its data.
 * `iam-be`: a container running the IAM login service Java application.
@@ -21,6 +21,7 @@ A description of the role played by each Docker Compose service is reported here
 * `client`: an example OpenID Connect client application for IAM.
 * `nginx-voms`: an OpenResty VOMS container providing TLS termination and client VOMS attribute certificate parsing and validation, deployed as a service that protects the VOMS-AA.
 * `voms-aa`: a container running the VOMS Attribute Authority Java application.
+* `voms-client`: a CENTOS 7 container that provides VOMS client CLI with LSC and VOMSES files properly configured for a custom VO.
 
 The correct start timing for those services that rely on other services is managed by the [`wait-for-it.sh`](https://github.com/vishnubob/wait-for-it) script by [vishnubob](https://github.com/vishnubob).
 
@@ -52,13 +53,16 @@ A decision between starting or not one or more docker containers on the VM must 
 ![INFN-CLOUD Docker Decision](pictures/infn_cloud_docker_decision.png?raw=true "INFN-CLOUD Docker Decision")
 
 In `Services` TAB, environment variables to be made available to the docker containers at runtime can be specified in the form of `key:value`. Multiple variables can be specified using the `ADD` button.  
-Environment variables that contain the *server certificate* and *private key* are **mandatory**. The private key must be base64 encoded before being inserted as `IAM_PRIV_KEY` value, and this can be easily done using the [encode-hostkey.sh](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/scripts/encode-hostkey.sh) script.  
+Environment variables that contain the *server certificate* and *private key* are **mandatory**. The private key must be base64 encoded before being inserted as `IAM_PRIV_KEY` value, and this can be easily done using the [encode-private-key.sh](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/scripts/encode-private-key.sh) script.  
 Here is a list of the principal variables that can/**must** be set:
 
 * `IAM_PRIV_KEY` **must** be filled with the base64 encoded content of the IAM server private key file.
 * `IAM_CERT_URL` **must** be filled with the URL provided by [Sectigo](https://www.sectigostore.com) to download the requested server certificate. 
 * `IAM_FQDN` **must** be set to the IAM server name contained in the server certificate.
-* `IAM_VERSION` can be set to the preferred IAM release for the services to be installed (default is `v1.6.0`).
+* `IAM_VERSION` can be set to the preferred IAM release to be installed (default is `v1.6.0`).
+* `VO_NAME` can be set to a custom VO name (default is `test.vo`).
+* `USER_PRIV_KEY` can be set with the base64 encoded content of a VOMS client private key file.
+* `USER_CERT_URL` can be set with the URL from which the client certificate associated to the previous VOMS client private key can be downloaded. 
 * `MYSQL_DB` can be set to a custom value (default is `db`).
 * `MYSQL_USERNAME` can be set to a custom value (default is `iam`).
 * `MYSQL_PWD` can be set to a custom value (default is `pwd`).
@@ -86,8 +90,6 @@ When the deployment is completed, the public IP of the freshly instantiated VM c
 
 ![INFN-CLOUD Output Values](pictures/infn_cloud_output_values.png?raw=true "INFN-CLOUD Output Values")
 
-In order for the client to properly contact the IAM server, this public IP must be mapped on the server FQDN in the `/etc/hosts` client file.
-A Docker image to deploy a container providing VOMS client CLI with LSC and VOMSES files properly configured for a VO named `test.vo` is available at [ffornari/voms-client](https://hub.docker.com/repository/docker/ffornari/voms-client) on Docker Hub.
-
+In order for the client to properly contact the IAM server, this public IP must be mapped on the server FQDN in the `/etc/hosts` file of the VOMS client.
 
 
