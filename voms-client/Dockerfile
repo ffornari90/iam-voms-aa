@@ -23,7 +23,7 @@ enabled=1' | tee /etc/yum.repos.d/ca.repo && \
     -o /etc/pki/ca-trust/source/anchors/geant-ov-rsa-ca.pem && \
     update-ca-trust && \
     mkdir -p /etc/vomses /etc/grid-security/vomsdir/$VO /root/.globus && \
-    if [[ ! -z "$CLIENT_CERT_URL" ]]; then curl \"$${CLIENT_CERT_URL}\" -o /root/.globus/usercert.pem; \
+    if [[ ! -z "$CLIENT_CERT_URL" ]]; then curl "${CLIENT_CERT_URL}" -o /root/.globus/usercert.pem; \
       chmod 600 /root/.globus/usercert.pem; \
     else echo "WARNING"':'" certificate for VOMS client NOT set"'!'; fi && \
     if [[ ! -z "$CLIENT_PRIV_KEY" ]]; then echo $CLIENT_PRIV_KEY | base64 -d | tee /root/.globus/userkey.pem; \

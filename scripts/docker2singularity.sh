@@ -10,7 +10,7 @@ else
              --rm \
              quay.io/singularity/docker2singularity \
              -m "/output" \
-             -n voms-client \
+             -n ${DOCKER_IMAGE_NAME} \
              ${DOCKER_IMAGE_NAME}
   exit 0
 fi

@@ -9,8 +9,8 @@ if [[ ! -z "${IAM_CERT_URL}" ]]; then
 fi
 docker build --build-arg VO=${VO_NAME:-test.vo} \
              --build-arg IAM_HOST=${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it} \
-             --build-arg HOST_CERT_SUBJECT=${SUBJECT:-"/DC=org/DC=terena/DC=tcs/C=IT/ST=Roma/O=Istituto Nazionale di Fisica Nucleare/OU=CNAF/CN=iam-indigo.cr.cnaf.infn.it"} \
-             --build-arg HOST_CERT_ISSUER=${ISSUER:-"/C=NL/O=GEANT Vereniging/CN=GEANT eScience SSL CA 4"} \
+             --build-arg HOST_CERT_SUBJECT="${SUBJECT:-\"/DC=org/DC=terena/DC=tcs/C=IT/ST=Roma/O=Istituto Nazionale di Fisica Nucleare/OU=CNAF/CN=iam-indigo.cr.cnaf.infn.it\"}" \
+             --build-arg HOST_CERT_ISSUER="${ISSUER:-\"/C=NL/O=GEANT Vereniging/CN=GEANT eScience SSL CA 4\"}" \
              --build-arg CLIENT_CERT_URL=${USER_CERT_URL} \
              --build-arg CLIENT_PRIV_KEY=${USER_PRIV_KEY} \
              -f ${ROOTDIR}/voms-client/Dockerfile \
