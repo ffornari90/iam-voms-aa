@@ -49,7 +49,7 @@ pipeline {
                 script {
                     try {
                         sh "docker build -f iam-voms-aa/sidecar/Dockerfile -t $sidecarImage:$BUILD_VERSION iam-voms-aa/sidecar"
-                        sh "docker build -f iam-voms-aa/openssl/Dockerfile -t $opensslImage:$BUILD_VERSION iam-voms-aa/sidecar"
+                        sh "docker build -f iam-voms-aa/openssl/Dockerfile -t $opensslImage:$BUILD_VERSION iam-voms-aa/openssl"
                     } catch (e) {
                         updateGitlabCommitStatus name: 'build', state: 'failed'
                     }
