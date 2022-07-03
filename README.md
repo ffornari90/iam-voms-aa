@@ -29,13 +29,13 @@ Deployment procedure on INFN Cloud
 
 Connect to the [INFN-CLOUD dashboard](https://my.cloud.infn.it/). Authenticate with the credentials used for the [INFN-CLOUD IAM](https://iam.cloud.infn.it/login) account in order to access the dashboard.
 
-<img src="pictures/infn_cloud_new_dashb.png?raw=true" width="600"/> | <img src="pictures/infn_cloud_iam_login.png?raw=true" width="250"/>
+<img src="pictures/infn_cloud_new_dashb.png?raw=true" width="600"/> <img src="pictures/infn_cloud_iam_login.png?raw=true" width="250"/>
 
 After login into the dashboard, select the `Docker-compose` card in the service catalog and click on the Configure button.
 
 ![INFN-CLOUD Docker-compose](pictures/infn_cloud_docker_compose_card.png?raw=true "INFN-CLOUD Docker-compose")
 
-A menu is made available, as in the figure bellow, and a configuration of the docker storage must be chosen.
+A menu is made available, as in the figure below, and a configuration of the docker storage must be chosen.
 
 ![INFN-CLOUD Docker storage](pictures/infn_cloud_docker_storage.png?raw=true "INFN-CLOUD Docker storage")
 
