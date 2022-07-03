@@ -12,16 +12,16 @@ Here is a scheme illustrating the architecture of the principal services.
 
 A description of the role played by each Docker Compose service is reported hereafter:
 
-* `sidecar`: a CENTOS 7 utility container providing a volume that contains configuration files and scripts useful to other containers.
-* `trust`: a CENTOS 7 utility container that contains fetch-crl and other utilities to provide up-to-date trust anchors to relying applications.
-* `hostcert`: a CENTOS 7 utility container that provides a server certificate and private key to relying applications.
+* `sidecar`: a CentOS 7 utility container providing a volume that contains configuration files and scripts useful to other containers.
+* `trust`: a CentOS 7 utility container that contains fetch-crl and other utilities to provide up-to-date trust anchors to relying applications.
+* `hostcert`: a CentOS 7 utility container that provides a server certificate and private key to relying applications.
 * `db`: a MySQL container starting a database where IAM will securely store its data.
 * `iam-be`: a container running the IAM login service Java application.
 * `nginx-iam`: an NGINX container that provides a reverse-proxy with SSL protecting the IAM login service.  
 * `client`: an example OpenID Connect client application for IAM.
 * `nginx-voms`: an OpenResty VOMS container providing TLS termination and client VOMS attribute certificate parsing and validation, deployed as a service that protects the VOMS-AA.
 * `voms-aa`: a container running the VOMS Attribute Authority Java application.
-* `voms-client`: a CENTOS 7 container that provides VOMS client CLI with LSC and VOMSES files properly configured for a custom VO.
+* `voms-client`: a CentOS 7 container that provides VOMS client CLI with LSC and VOMSES files properly configured for a custom VO.
 
 The correct start timing for those services that rely on other services is managed by the [`wait-for-it.sh`](https://github.com/vishnubob/wait-for-it) script by [vishnubob](https://github.com/vishnubob).
 
@@ -62,7 +62,7 @@ Here is a list of the principal variables that can/**must** be set:
 * `IAM_VERSION` can be set to the preferred IAM release to be installed (default is `v1.6.0`).
 * `VO_NAME` can be set to a custom VO name (default is `test.vo`).
 * `USER_PRIV_KEY` can be set with the base64 encoded content of a VOMS client private key file.
-* `USER_CERT_URL` can be set with the URL from which the client certificate associated to the previous VOMS client private key can be downloaded. 
+* `USER_CERT_URL` can be set with the URL from which the VOMS client certificate can be downloaded. 
 * `MYSQL_DB` can be set to a custom value (default is `db`).
 * `MYSQL_USERNAME` can be set to a custom value (default is `iam`).
 * `MYSQL_PWD` can be set to a custom value (default is `pwd`).
