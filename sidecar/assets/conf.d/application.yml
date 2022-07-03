@@ -36,4 +36,4 @@ voms:
   aa:
     host: ${IAM_HOST}
     port: ${server.port}
-    vo-name: test.vo
+    vo-name: ${VO}

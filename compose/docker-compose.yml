@@ -13,11 +13,11 @@ services:
     container_name: sidecar
     command: /bin/sh -c "
         cp /wait-for-it.sh /files
-        && cp /voms-ng.conf /files
         && cp /application.yml /files
         && curl \"$${HOST_CERT_URL}\" -o /hostcert.pem
         && export HOST_CERT_SUBJECT=$$(openssl x509 -in /hostcert.pem -noout -subject | awk -F\"subject= \" '{print $$2}')
         && export HOST_CERT_ISSUER=$$(openssl x509 -in /hostcert.pem -noout -issuer | awk -F\"issuer= \" '{print $$2}')
+        && envsubst '$${VO},$${IAM_HOST}' < /voms-ng.conf > /files/voms-ng.conf
         && envsubst '$${VO},$${IAM_HOST},$${HOST_CERT_SUBJECT}' < /vomses.template > /files/$$VO
         && envsubst '$${HOST_CERT_SUBJECT},$${HOST_CERT_ISSUER}' < /lsc.template > /files/$$IAM_HOST.lsc
         && sleep infinity
@@ -35,9 +35,13 @@ services:
     image: centos:7
     container_name: hostcert
     hostname: hostcert
-    command: /bin/sh -c "
-        echo $$HOST_PRIV_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem
-        && curl \"$${HOST_CERT_URL}\" -o /etc/ssl/certs/hostcert.pem
+    command: /bin/bash -c "
+        yum install -y epel-release
+        && yum install -y netcat
+        && if [[ ! -z \"$$HOST_PRIV_KEY\" ]]; then echo $$HOST_PRIV_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem;
+           else echo \"ERROR\"':'\" private key for IAM server NOT set\"'!'; fi
+        && if [[ ! -z \"$$HOST_CERT_URL\" ]]; then curl \"$${HOST_CERT_URL}\" -o /etc/ssl/certs/hostcert.pem;
+           else echo \"ERROR\"':'\" certificate for IAM server NOT set\"'!'; fi
         && nc -l 8085
       "
 
@@ -53,11 +57,14 @@ services:
     container_name: trust
     hostname: trust
     entrypoint:
-       /bin/sh -c "
-         yum install -y netcat
-         && /update-trust-anchors.sh
-         && nc -l 8086
-       "
+      /bin/sh -c "
+        yum install -y epel-release
+        && yum install -y netcat
+        && /update-trust-anchors.sh
+        && echo '# GEANT eScience Personal CA 4' | tee -a /etc/pki/tls/certs/ca-bundle.crt
+        && cat /etc/grid-security/certificates/GEANTeSciencePersonalCA4.pem | tee -a /etc/pki/tls/certs/ca-bundle.crt
+        && nc -l 8086
+      "
 
     environment:
       FORCE_TRUST_ANCHORS_UPDATE: 1
@@ -87,7 +94,7 @@ services:
     links:
       - "db:db"
 
-    command: /bin/sh -c "
+    command: /bin/bash -c "
         /files/wait-for-it.sh -t 0 db:3306
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
@@ -101,8 +108,8 @@ services:
       IAM_JAVA_MEM_OPTS: -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
       IAM_VERS: ${IAM_VERSION:-v1.6.0}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-      IAM_BASE_URL: ${IAM_URL:-https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}}
-      IAM_ISSUER: ${IAM_ISSUER:-https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}}
+      IAM_BASE_URL: https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
+      IAM_ISSUER: https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
       IAM_USE_FORWARDED_HEADERS: "true"
       IAM_NOTIFICATION_DISABLE: "true"
       IAM_DB_HOST: ${MYSQL_DB:-db}
@@ -192,10 +199,7 @@ services:
       - "voms-aa:voms-aa"
 
     command: /bin/sh -c "
-        mkdir -p /vomsdir/$$VO
-        && cp /files/$$IAM_HOST.lsc /vomsdir/$$VO/
-        && envsubst '$${IAM_HOST}' < /files/voms-ng.conf > /etc/nginx/conf.d/voms-ng.conf
-        && /files/wait-for-it.sh -t 0 voms-aa:15000
+        /etc/nginx/conf.d/wait-for-it.sh -t 0 voms-aa:15000
         && /usr/local/openresty-voms/nginx/sbin/nginx -g 'daemon off;'
       "
 
@@ -212,7 +216,7 @@ services:
       - cabundle:/etc/pki
       - trustanchors:/etc/grid-security/certificates
       - certs:/certs
-      - files:/files
+      - files:/etc/nginx/conf.d
       
     depends_on:
       - sidecar
@@ -227,9 +231,17 @@ services:
     extra_hosts:
       - "${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}:host-gateway"
 
-    command: /bin/sh -c "
-        /files/wait-for-it.sh -t 0 nginx-voms:15000
-        && mkdir -p /etc/grid-security/vomsdir/$$VO /etc/vomses
+    command: /bin/bash -c "
+        yum install -y epel-release
+        && yum install -y voms-clients-java
+        && mkdir -p /etc/grid-security/vomsdir/$$VO /etc/vomses /root/.globus
+        && if [[ ! -z \"$$CLIENT_CERT_URL\" ]]; then curl \"$${CLIENT_CERT_URL}\" -o /root/.globus/usercert.pem; 
+           chmod 600 /root/.globus/usercert.pem;
+           else echo \"WARNING\"':'\" certificate for VOMS client NOT set\"'!'; fi
+        && if [[ ! -z \"$$CLIENT_PRIV_KEY\" ]]; then echo $$CLIENT_PRIV_KEY | base64 -d | tee /root/.globus/userkey.pem; 
+           chmod 400 /root/.globus/userkey.pem;
+           else echo \"WARNING\"':'\" private key for VOMS client NOT set\"'!'; fi
+        && /files/wait-for-it.sh -t 0 nginx-voms:443
         && cp /files/$$IAM_HOST.lsc /etc/grid-security/vomsdir/$$VO/
         && cp /files/$$VO /etc/vomses/
         && sleep infinity
@@ -238,6 +250,8 @@ services:
     environment:
       TZ: Europe/Rome
       VO: ${VO_NAME:-test.vo}
+      CLIENT_PRIV_KEY: ${USER_PRIV_KEY}
+      CLIENT_CERT_URL: ${USER_CERT_URL}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
 
     volumes:
