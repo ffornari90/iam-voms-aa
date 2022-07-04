@@ -97,7 +97,7 @@ Testing VOMS-AA
 
 IAM server can be accessed at `IAM_BASE_URL` using admin default credentials (`admin:password`); for security reasons it is recommended to change the password as soon as possible.
 
-<img src="pictures/indigo_iam_login.png?raw=true" width="205"/> <img src="pictures/indigo_iam_dashb.png?raw=true" width="755"/>
+<img src="pictures/indigo_iam_login.png?raw=true" width="200"/> <img src="pictures/indigo_iam_dashb.png?raw=true" width="750"/>
 
 An IAM user has to be created for testing purposes. On the IAM dashboard, hit `Users` on the left panel and then click on `+ Add User`. Fill the form with the user information.
 
