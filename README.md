@@ -95,9 +95,9 @@ In order for the client to properly contact the IAM server, this public IP must 
 Testing VOMS-AA
 -----------
 
-IAM server can be accessed at `IAM_BASE_URL` using admin default credentials (`admin:password`); for security reasons it is recommended to change them as soon as possible.
+IAM server can be accessed at `IAM_BASE_URL` using admin default credentials (`admin:password`); for security reasons it is recommended to change the password as soon as possible.
 
-<img src="pictures/indigo_iam_login.png?raw=true" width="250"/> <img src="pictures/indigo_iam_dashb.png?raw=true" width="600"/>
+<img src="pictures/indigo_iam_login.png?raw=true" width="150"/> <img src="pictures/indigo_iam_dashb.png?raw=true" width="700"/>
 
 An IAM user has to be created for testing purposes. On the IAM dashboard, hit `Users` on the left panel and then click on `+ Add User`. Fill the form with the user information.
 
