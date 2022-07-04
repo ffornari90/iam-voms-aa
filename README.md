@@ -3,7 +3,8 @@
 VOMS Attribute Authority (VOMS-AA) is a plugin that provides backward-compatible VOMS support for a Virtual Organization managed with INDIGO IAM.
 The VOMS Attribute Authority can access the IAM database and encode IAM groups and other attributes in a standard VOMS attribute certificate. This means that IAM can act both as an OAuth/OpenID Connect authorization server and as a VOMS server for a given organization. 
 
-# Docker Compose file
+Docker Compose structure
+-----------
 
 The architecture of IAM with VOMS-AA embedded in [docker-compose.yml](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/compose/docker-compose.yml) has been realized starting from the INDIGO IAM official [VOMS-AA Docker Compose file](https://github.com/indigo-iam/voms-aa/blob/master/compose/docker-compose.yml) and is meant to automatize services instantiation using INFN Cloud Docker Compose deployment functionality.  
 Here is a scheme illustrating the architecture of the principal services.
@@ -14,7 +15,6 @@ A description of the role played by each Docker Compose service is reported here
 
 * `sidecar`: a CentOS 7 utility container providing a volume that contains configuration files and scripts useful to other containers.
 * `trust`: a CentOS 7 utility container that contains fetch-crl and other utilities to provide up-to-date trust anchors to relying applications.
-* `hostcert`: a CentOS 7 utility container that provides a server certificate and private key to relying applications.
 * `db`: a MySQL container starting a database where IAM will securely store its data.
 * `iam-be`: a container running the IAM login service Java application.
 * `nginx-iam`: an NGINX container that provides a reverse-proxy with SSL protecting the IAM login service.  
@@ -62,7 +62,7 @@ Here is a list of the principal variables that can/**must** be set:
 * `IAM_VERSION` can be set to the preferred IAM release to be installed (default is `v1.6.0`).
 * `VO_NAME` can be set to a custom VO name (default is `test.vo`).
 * `USER_PRIV_KEY` can be set with the base64 encoded content of a VOMS client private key file.
-* `USER_CERT_URL` can be set with the URL from which the VOMS client certificate can be downloaded. 
+* `USER_CERT_URL` can be set with the URL from which the VOMS client X.509 certificate can be downloaded. 
 * `MYSQL_DB` can be set to a custom value (default is `db`).
 * `MYSQL_USERNAME` can be set to a custom value (default is `iam`).
 * `MYSQL_PWD` can be set to a custom value (default is `pwd`).
@@ -92,4 +92,27 @@ When the deployment is completed, the public IP of the freshly instantiated VM c
 
 In order for the client to properly contact the IAM server, this public IP must be mapped on the server FQDN in the `/etc/hosts` file of the VOMS client.
 
+Testing VOMS-AA
+-----------
 
+IAM server can be accessed at `IAM_BASE_URL` using admin default credentials (`admin:password`); for security reasons it is recommended to change them as soon as possible.
+
+![INDIGO-IAM Login](pictures/indigo_iam_login.png?raw=true "INDIGO-IAM Login")
+
+An IAM user has to be created for testing purposes. On the IAM dashboard, hit `Users` on the left panel and then click on `+ Add User`. Fill the form with the user information.
+
+![INDIGO-IAM Create User](pictures/indigo_iam_create_user.png?raw=true "INDIGO-IAM Create User")
+
+Now, add a root group with the name selected for the custom VO. On the left panel of the IAM dashboard hit `Groups` and then click on `+ Add Root Group`. Fill the form with the VO name.
+
+![INDIGO-IAM Create Group](pictures/indigo_iam_create_group.png?raw=true "INDIGO-IAM Create Group")
+
+Add the previously created user to the group. Go to `Users`, click on the user profile and then hit `+ Add to group`. Select the VO group.
+
+![INDIGO-IAM Add User to Group](pictures/indigo_iam_add_user_group.png?raw=true "INDIGO-IAM Add User to Group")
+
+Add a personal X.509 certificate to the user. Click on `+ Add certificate` and then fill the form with the VO name as tag and the content of the X.509 certificate file.
+
+![INDIGO-IAM Add Cert to User](pictures/indigo_iam_add_cert_user.png?raw=true "INDIGO-IAM Add Cert to User")
+
+Connect via SSH to the IAM server and then enter the `voms-client` container.
