@@ -228,7 +228,7 @@ services:
         && if [[ ! -z \"$$CLIENT_PRIV_KEY\" ]]; then echo $$CLIENT_PRIV_KEY | base64 -d | tee /root/.globus/userkey.pem; 
            chmod 400 /root/.globus/userkey.pem;
            else echo \"WARNING\"':'\" private key for VOMS client NOT set\"'!'; fi
-        && /files/wait-for-it.sh -t 0 nginx-voms:443
+        && /scripts/wait-for-it.sh -t 0 nginx-voms:443
         && cp /conf.d/$$IAM_HOST.lsc /etc/grid-security/vomsdir/$$VO/
         && cp /conf.d/$$VO /etc/vomses/
         && sleep infinity
@@ -244,6 +244,7 @@ services:
     volumes:
       - cabundle:/etc/pki
       - trustanchors:/etc/grid-security/certificates
+      - scripts:/scripts
       - conf.d:/conf.d
 
     depends_on:
