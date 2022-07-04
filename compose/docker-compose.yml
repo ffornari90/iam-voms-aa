@@ -5,53 +5,39 @@ volumes:
   trustanchors:
   cabundle:
   certs:
-  files:
+  scripts:
+  conf.d:
 
 services:
   sidecar:
     image: ffornari/sidecar:latest
     container_name: sidecar
-    command: /bin/sh -c "
-        cp /wait-for-it.sh /files
-        && cp /application.yml /files
-        && curl \"$${HOST_CERT_URL}\" -o /hostcert.pem
-        && export HOST_CERT_SUBJECT=$$(openssl x509 -in /hostcert.pem -noout -subject | awk -F\"subject= \" '{print $$2}')
-        && export HOST_CERT_ISSUER=$$(openssl x509 -in /hostcert.pem -noout -issuer | awk -F\"issuer= \" '{print $$2}')
-        && envsubst '$${IAM_HOST}' < /voms-ng.conf > /files/voms-ng.conf
-        && envsubst '$${VO},$${IAM_HOST},$${HOST_CERT_SUBJECT}' < /vomses.template > /files/$$VO
-        && envsubst '$${HOST_CERT_SUBJECT},$${HOST_CERT_ISSUER}' < /lsc.template > /files/$$IAM_HOST.lsc
+    command: /bin/bash -c "
+        cp /wait-for-it.sh /scripts
+        && cp /application.yml /conf.d
+        && envsubst '$${IAM_HOST}' < /voms-ng.conf > /conf.d/voms-ng.conf
+        && if [[ ! -z \"$$HOST_PRIV_KEY\" ]]; then echo $$HOST_PRIV_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem;
+           else echo \"ERROR\"':'\" private key for IAM server NOT set\"'!'; fi
+        && if [[ ! -z \"$$HOST_CERT_URL\" ]]; then curl \"$${HOST_CERT_URL}\" -o /etc/ssl/certs/hostcert.pem;
+           export HOST_CERT_SUBJECT=$$(openssl x509 -in /etc/ssl/certs/hostcert.pem -noout -subject | awk -F\"subject= \" '{print $$2}');
+           export HOST_CERT_ISSUER=$$(openssl x509 -in /etc/ssl/certs/hostcert.pem -noout -issuer | awk -F\"issuer= \" '{print $$2}');
+           envsubst '$${VO},$${IAM_HOST},$${HOST_CERT_SUBJECT}' < /vomses.template > /conf.d/$$VO;
+           envsubst '$${HOST_CERT_SUBJECT},$${HOST_CERT_ISSUER}' < /lsc.template > /conf.d/$$IAM_HOST.lsc;
+           else echo \"ERROR\"':'\" certificate for IAM server NOT set\"'!'; fi
         && sleep infinity
       "
 
     volumes:
-      - files:/files
+      - scripts:/scripts
+      - conf.d:/conf.d
+      - certs:/etc/ssl/certs
 
     environment:
       VO: ${VO_NAME:-test.vo}
+      HOST_PRIV_KEY: ${IAM_PRIV_KEY}
       HOST_CERT_URL: ${IAM_CERT_URL}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
       
-  hostcert:
-    image: centos:7
-    container_name: hostcert
-    hostname: hostcert
-    command: /bin/bash -c "
-        yum install -y epel-release
-        && yum install -y netcat
-        && if [[ ! -z \"$$HOST_PRIV_KEY\" ]]; then echo $$HOST_PRIV_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem;
-           else echo \"ERROR\"':'\" private key for IAM server NOT set\"'!'; fi
-        && if [[ ! -z \"$$HOST_CERT_URL\" ]]; then curl \"$${HOST_CERT_URL}\" -o /etc/ssl/certs/hostcert.pem;
-           else echo \"ERROR\"':'\" certificate for IAM server NOT set\"'!'; fi
-        && nc -l 8085
-      "
-
-    environment:
-      HOST_PRIV_KEY: ${IAM_PRIV_KEY}
-      HOST_CERT_URL: ${IAM_CERT_URL}
-
-    volumes:
-      - certs:/etc/ssl/certs
-
   trust:
     image: indigoiam/egi-trustanchors:latest
     container_name: trust
@@ -95,7 +81,7 @@ services:
       - "db:db"
 
     command: /bin/bash -c "
-        /files/wait-for-it.sh -t 0 db:3306
+        /scripts/wait-for-it.sh -t 0 db:3306
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then java $$IAM_JAVA_OPTS org.springframework.boot.loader.WarLauncher;
@@ -117,7 +103,7 @@ services:
       IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
   
     volumes:
-      - files:/files
+      - scripts:/scripts
 
     depends_on:
       - sidecar
@@ -135,23 +121,21 @@ services:
     hostname: nginx-iam
     links:
       - "trust:trust"
-      - "hostcert:hostcert"
       - "iam-be:iam-be"
       - "client:client"
 
     command: /bin/sh -c "
         cp /certs/hostcert.pem /etc/ssl/certs/iam.cert.pem
         && cp /certs/hostkey.pem /etc/ssl/private/iam.key.pem
-        && /files/wait-for-it.sh -t 0 trust:8086
-        && /files/wait-for-it.sh -t 0 hostcert:8085
-        && /files/wait-for-it.sh -t 0 iam-be:8080
-        && /files/wait-for-it.sh -t 0 client:8080
+        && /scripts/wait-for-it.sh -t 0 trust:8086
+        && /scripts/wait-for-it.sh -t 0 iam-be:8080
+        && /scripts/wait-for-it.sh -t 0 client:8080
         && nginx -g 'daemon off;'
       "
 
     volumes:
       - certs:/certs
-      - files:/files
+      - scripts:/scripts
 
     environment:
       TZ: Europe/Rome
@@ -172,8 +156,8 @@ services:
 
     entrypoint:
       /bin/sh -c "
-        cp /files/application.yml /app/resources/
-        && /files/wait-for-it.sh -t 0 nginx-iam:443
+        cp /conf.d/application.yml /app/resources/
+        && /scripts/wait-for-it.sh -t 0 nginx-iam:443
         && java -cp @/app/jib-classpath-file it.infn.mw.voms.VomsService
       "
 
@@ -188,7 +172,8 @@ services:
     volumes:
       - certs:/etc/grid-security/voms
       - trustanchors:/etc/grid-security/certificates
-      - files:/files
+      - scripts:/scripts
+      - conf.d:/conf.d
 
     depends_on:
       - sidecar
@@ -200,7 +185,7 @@ services:
       - "voms-aa:voms-aa"
 
     command: /bin/sh -c "
-        /etc/nginx/conf.d/wait-for-it.sh -t 0 voms-aa:15000
+        /scripts/wait-for-it.sh -t 0 voms-aa:15000
         && /usr/local/openresty-voms/nginx/sbin/nginx -g 'daemon off;'
       "
 
@@ -217,7 +202,8 @@ services:
       - cabundle:/etc/pki
       - trustanchors:/etc/grid-security/certificates
       - certs:/certs
-      - files:/etc/nginx/conf.d
+      - scripts:/scripts
+      - conf.d:/etc/nginx/conf.d
       
     depends_on:
       - sidecar
@@ -243,8 +229,8 @@ services:
            chmod 400 /root/.globus/userkey.pem;
            else echo \"WARNING\"':'\" private key for VOMS client NOT set\"'!'; fi
         && /files/wait-for-it.sh -t 0 nginx-voms:443
-        && cp /files/$$IAM_HOST.lsc /etc/grid-security/vomsdir/$$VO/
-        && cp /files/$$VO /etc/vomses/
+        && cp /conf.d/$$IAM_HOST.lsc /etc/grid-security/vomsdir/$$VO/
+        && cp /conf.d/$$VO /etc/vomses/
         && sleep infinity
       "
 
@@ -258,7 +244,7 @@ services:
     volumes:
       - cabundle:/etc/pki
       - trustanchors:/etc/grid-security/certificates
-      - files:/files
+      - conf.d:/conf.d
 
     depends_on:
       - sidecar

@@ -11,7 +11,7 @@ RUN yum install -y epel-release && \
     yum clean all && \
     rm -rf /var/cache/yum && \
     chmod +x /wait-for-it.sh
-CMD ["/bin/sh", "-c", "cp /wait-for-it.sh /files \
-    && cp /voms-ng.conf /files \
-    && cp /application.yml /files \
+CMD ["/bin/sh", "-c", "cp /wait-for-it.sh /scripts \
+    && cp /voms-ng.conf /conf.d \
+    && cp /application.yml /conf.d \
     && sleep infinity"]
