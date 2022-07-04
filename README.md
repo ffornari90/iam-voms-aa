@@ -97,7 +97,7 @@ Testing VOMS-AA
 
 IAM server can be accessed at `IAM_BASE_URL` using admin default credentials (`admin:password`); for security reasons it is recommended to change the password as soon as possible.
 
-<img src="pictures/indigo_iam_login.png?raw=true" width="150"/> <img src="pictures/indigo_iam_dashb.png?raw=true" width="700"/>
+<img src="pictures/indigo_iam_login.png?raw=true" width="180"/> <img src="pictures/indigo_iam_dashb.png?raw=true" width="775"/>
 
 An IAM user has to be created for testing purposes. On the IAM dashboard, hit `Users` on the left panel and then click on `+ Add User`. Fill the form with the user information.
 
@@ -115,4 +115,61 @@ Add a personal X.509 certificate to the user. Click on `+ Add certificate` and t
 
 ![INDIGO-IAM Add Cert to User](pictures/indigo_iam_add_cert_user.png?raw=true "INDIGO-IAM Add Cert to User")
 
-Connect via SSH to the IAM server and then enter the `voms-client` container.
+Connect via SSH to the IAM server and then enter the `voms-client` container. Verify that a VOMS proxy can be fetched from the VOMS-AA service.
+
+```
+fornari@pc-fornari:~$ ssh 131.154.96.58
+Welcome to Ubuntu 20.04.4 LTS (GNU/Linux 5.4.0-121-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Mon Jul  4 18:17:50 CEST 2022
+
+  System load:  1.93              Users logged in:                  0
+  Usage of /:   8.2% of 77.36GB   IPv4 address for br-4714e3d0e50f: 172.17.0.1
+  Memory usage: 41%               IPv4 address for docker0:         172.0.17.1
+  Swap usage:   0%                IPv4 address for ens3:            10.10.0.252
+  Processes:    194
+
+ * Super-optimized for small spaces - read how we shrank the memory
+   footprint of MicroK8s to make it the smallest full K8s around.
+
+   https://ubuntu.com/blog/microk8s-memory-optimisation
+
+0 updates can be applied immediately.
+
+
+Last login: Mon Jul  4 18:16:00 2022 from 172.16.11.75
+fornari@vnode-0:~$ cd /opt/iam-voms-aa/
+fornari@vnode-0:/opt/iam-voms-aa$ docker-compose exec voms-client bash
+[root@voms-client /]# voms-proxy-init --voms test.vo
+Enter GRID pass phrase for this identity:
+Contacting iam-indigo.cr.cnaf.infn.it:15000 [/DC=org/DC=terena/DC=tcs/C=IT/ST=Roma/O=Istituto Nazionale di Fisica Nucleare/CN=iam-indigo.cr.cnaf.infn.it] "test.vo"...
+Remote VOMS server contacted succesfully.
+
+
+Created proxy in /tmp/x509up_u0.
+
+Your proxy is valid until Tue Jul 05 06:22:43 CEST 2022
+[root@voms-client /]# voms-proxy-info -all
+subject   : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it/CN=1041735720
+issuer    : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+identity  : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+type      : RFC3820 compliant impersonation proxy
+strength  : 2048
+path      : /tmp/x509up_u0
+timeleft  : 11:59:53
+key usage : Digital Signature, Key Encipherment
+=== VO test.vo extension information ===
+VO        : test.vo
+subject   : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+issuer    : /DC=org/DC=terena/DC=tcs/C=IT/ST=Roma/O=Istituto Nazionale di Fisica Nucleare/CN=iam-indigo.cr.cnaf.infn.it
+attribute : /test.vo
+timeleft  : 11:59:52
+uri       : iam-indigo.cr.cnaf.infn.it:15000
+
+[root@voms-client /]#
+```
+
