@@ -97,7 +97,7 @@ Testing VOMS-AA
 
 IAM server can be accessed at `IAM_BASE_URL` using admin default credentials (`admin:password`); for security reasons it is recommended to change them as soon as possible.
 
-![INDIGO-IAM Login](pictures/indigo_iam_login.png?raw=true "INDIGO-IAM Login")
+<img src="pictures/indigo_iam_login.png?raw=true" width="250"/> <img src="pictures/indigo_iam_dashb.png?raw=true" width="600"/>
 
 An IAM user has to be created for testing purposes. On the IAM dashboard, hit `Users` on the left panel and then click on `+ Add User`. Fill the form with the user information.
 
@@ -111,7 +111,7 @@ Add the previously created user to the group. Go to `Users`, click on the user p
 
 ![INDIGO-IAM Add User to Group](pictures/indigo_iam_add_user_group.png?raw=true "INDIGO-IAM Add User to Group")
 
-Add a personal X.509 certificate to the user. Click on `+ Add certificate` and then fill the form with the VO name as tag and the content of the X.509 certificate file.
+Add a personal X.509 certificate to the user. Click on `+ Add certificate` and then fill the form with the VO name as label and the content of the X.509 certificate file.
 
 ![INDIGO-IAM Add Cert to User](pictures/indigo_iam_add_cert_user.png?raw=true "INDIGO-IAM Add Cert to User")
 
