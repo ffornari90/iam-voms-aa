@@ -90,7 +90,7 @@ When the deployment is completed, the public IP of the freshly instantiated VM c
 
 ![INFN-CLOUD Output Values](pictures/infn_cloud_output_values.png?raw=true "INFN-CLOUD Output Values")
 
-In order for the client to properly contact the IAM server, this public IP must be mapped on the server FQDN in the `/etc/hosts` file of the VOMS client.
+In order for the client to properly contact the IAM server, this public IP must be mapped on the server FQDN in the `/etc/hosts` file of the client.
 
 Testing VOMS-AA
 -----------
@@ -173,3 +173,137 @@ uri       : iam-indigo.cr.cnaf.infn.it:15000
 [root@voms-client /]#
 ```
 
+Alternatively, the [build-voms-client.sh](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/scripts/build-voms-client.sh) script can be used to locally create a Docker image for a properly configured VOMS client. Some environment variables may/**must** be set prior to the execution of the script:
+
+* `IAM_CERT_URL` **must** be set to the URL from which the IAM server certificate can be downloaded.
+* `USER_CERT_URL` can be set to the URL from which the client X.509 certificate can be downloaded.
+* `USER_PRIV_KEY` can be set to the client base64-encoded private key (encoding can be done using [encode-private-key.sh](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/scripts/encode-private-key.sh) script).
+
+After the Docker image has been built, a Docker container can be started with `docker run` command, using the `--add-host` option to map the IAM server's IP on its FQDN. For example:
+
+```
+fornari@pc-fornari:~/iam-voms-aa$ docker run -it --rm --add-host iam-indigo.cr.cnaf.infn.it:131.154.96.58 voms-client
+[user@14bb4c8fd087 /]$ voms-proxy-init --voms test.vo
+Enter GRID pass phrase for this identity:
+Contacting iam-indigo.cr.cnaf.infn.it:15000 [/DC=org/DC=terena/DC=tcs/C=IT/ST=Roma/O=Istituto Nazionale di Fisica Nucleare/CN=iam-indigo.cr.cnaf.infn.it] "test.vo"...
+Remote VOMS server contacted succesfully.
+
+
+Created proxy in /tmp/x509up_u1000.
+
+Your proxy is valid until Wed Jul 06 04:44:42 UTC 2022
+[user@14bb4c8fd087 /]$ voms-proxy-info -all
+subject   : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it/CN=656001799
+issuer    : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+identity  : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+type      : RFC3820 compliant impersonation proxy
+strength  : 2048
+path      : /tmp/x509up_u1000
+timeleft  : 11:59:54
+key usage : Digital Signature, Key Encipherment
+=== VO test.vo extension information ===
+VO        : test.vo
+subject   : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+issuer    : /DC=org/DC=terena/DC=tcs/C=IT/ST=Roma/O=Istituto Nazionale di Fisica Nucleare/CN=iam-indigo.cr.cnaf.infn.it
+attribute : /test.vo
+timeleft  : 11:59:54
+uri       : iam-indigo.cr.cnaf.infn.it:15000
+
+[user@14bb4c8fd087 /]$ exit
+exit
+fornari@pc-fornari:~/iam-voms-aa$
+```
+
+If the VOMS proxy needs to be provided on a server away from your local PC, where [Singularity](https://sylabs.io/singularity/) is available but your user has no superuser privileges, the `voms-client` Docker image can be converted to a Singularity image. Just run the [docker2singularity.sh](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/scripts/docker2singularity.sh) script to produce a `voms-client.sif` file:
+
+```
+fornari@pc-fornari:~/iam-voms-aa$ ./scripts/docker2singularity.sh voms-client
+
+Image Format: squashfs
+Docker Image: voms-client
+Container Name: voms-client
+
+Inspected Size: 440 MB
+
+(1/10) Creating a build sandbox...
+(2/10) Exporting filesystem...
+(3/10) Creating labels...
+(4/10) Adding run script...
+(5/10) Setting ENV variables...
+(6/10) Adding mount points...
+(7/10) Fixing permissions...
+(8/10) Stopping and removing the container...
+(9/10) Building squashfs container...
+INFO:    Starting build...
+INFO:    Creating SIF file...
+INFO:    Build complete: /tmp/voms-client.sif
+(10/10) Moving the image to the output folder...
+    152,555,520 100%  446.19MB/s    0:00:00 (xfr#1, to-chk=0/1)
+Final Size: 146MB
+fornari@pc-fornari:~/iam-voms-aa$ ls -lrth voms-client.sif 
+-rwxr-xr-x 1 root root 146M Jul  5 15:43 voms-client.sif
+fornari@pc-fornari:~/iam-voms-aa$
+```
+
+The Singularity image can be copied everywhere you want. Then, a container can be started with `singularity run` command. Pay attention to always map the IAM server's IP on its FQDN. For example:
+
+```
+fornari@pc-fornari:~/iam-voms-aa$ scp voms-client.sif fefornar@lxplus.cern.ch:
+Warning: Permanently added the ECDSA host key for IP address '137.138.121.84' to the list of known hosts.
+Password: 
+voms-client.sif                                                            100%  145MB   6.7MB/s   00:21    
+fornari@pc-fornari:~/iam-voms-aa$ ssh fefornar@lxplus.cern.ch
+Warning: Permanently added the ECDSA host key for IP address '188.185.31.134' to the list of known hosts.
+Password: 
+* ********************************************************************
+* Welcome to lxplus702.cern.ch, CentOS Linux release 7.9.2009 (Core)
+* Archive of news is available in /etc/motd-archive
+* Reminder: you have agreed to the CERN
+*   computing rules, in particular OC5. CERN implements
+*   the measures necessary to ensure compliance.
+*   https://cern.ch/ComputingRules
+* Puppet environment: production, Roger state: production
+* Foreman hostgroup: lxplus/nodes/login
+* Availability zone: cern-geneva-c
+* LXPLUS Public Login Service - http://lxplusdoc.web.cern.ch/
+* A CS8 based lxplus8.cern.ch is now available
+* A C9 based lxplus9.cern.ch is now available
+* Please read LXPLUS Privacy Notice in http://cern.ch/go/TpV7
+* ********************************************************************
+[fefornar@lxplus702 ~]$ cat > hosts <<EOF
+> 127.0.0.1 localhost
+> 131.154.96.58 iam-indigo.cr.cnaf.infn.it
+> EOF
+[fefornar@lxplus702 ~]$ singularity run --no-home --writable --bind $PWD/hosts:/etc/hosts voms-client.sif
+INFO:    Converting SIF file to temporary sandbox...
+Singularity> voms-proxy-init --voms test.vo
+Enter GRID pass phrase for this identity:
+Contacting iam-indigo.cr.cnaf.infn.it:15000 [/DC=org/DC=terena/DC=tcs/C=IT/ST=Roma/O=Istituto Nazionale di Fisica Nucleare/CN=iam-indigo.cr.cnaf.infn.it] "test.vo"...
+Remote VOMS server contacted succesfully.
+
+
+Created proxy in /tmp/x509up_u145411.
+
+Your proxy is valid until Wed Jul 06 04:58:46 UTC 2022
+Singularity> voms-proxy-info -all
+subject   : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it/CN=1340947944
+issuer    : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+identity  : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+type      : RFC3820 compliant impersonation proxy
+strength  : 2048
+path      : /tmp/x509up_u145411
+timeleft  : 11:59:54
+key usage : Digital Signature, Key Encipherment
+=== VO test.vo extension information ===
+VO        : test.vo
+subject   : /DC=org/DC=terena/DC=tcs/C=IT/O=Istituto Nazionale di Fisica Nucleare/CN=Federico Fornari fornari@infn.it
+issuer    : /DC=org/DC=terena/DC=tcs/C=IT/ST=Roma/O=Istituto Nazionale di Fisica Nucleare/CN=iam-indigo.cr.cnaf.infn.it
+attribute : /test.vo
+timeleft  : 11:59:54
+uri       : iam-indigo.cr.cnaf.infn.it:15000
+
+Singularity> exit
+exit
+INFO:    Cleaning up image...
+[fefornar@lxplus702 ~]$
+```
