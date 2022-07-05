@@ -13,6 +13,7 @@ else
       exit 3
     else
       echo "$(cat $FILE)" | base64 -w0
+      printf '\n'
       exit 0
     fi
   fi
