@@ -52,7 +52,7 @@ A decision between starting or not one or more docker containers on the VM must 
 
 ![INFN-CLOUD Docker Decision](pictures/infn_cloud_docker_decision.png?raw=true "INFN-CLOUD Docker Decision")
 
-In `Services` TAB, environment variables to be made available to the docker containers at runtime can be specified in the form of `key:value`. Multiple variables can be specified using the `ADD` button.  
+In `Services` TAB, environment variables to be made available to the docker containers at runtime can be specified in the form of `key:value`. Multiple variables can be specified using the `Add` button.  
 Environment variables that contain the *server certificate* and *private key* are **mandatory**. The private key must be base64 encoded before being inserted as `IAM_PRIV_KEY` value, and this can be easily done using the [encode-private-key.sh](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/scripts/encode-private-key.sh) script.  
 Here is a list of the principal variables that can/**must** be set:
 
