@@ -178,6 +178,7 @@ Alternatively, the [build-voms-client.sh](https://baltig.infn.it/fornari/iam-vom
 * `IAM_CERT_URL` **must** be set to the URL from which the IAM server certificate can be downloaded.
 * `USER_CERT_URL` can be set to the URL from which the client X.509 certificate can be downloaded.
 * `USER_PRIV_KEY` can be set to the client base64-encoded private key (encoding can be done using [encode-private-key.sh](https://baltig.infn.it/fornari/iam-voms-aa/-/blob/main/scripts/encode-private-key.sh) script).
+* `VO_NAME` can be set to a custom VO name (default is `test.vo`).
 
 After the Docker image has been built, a Docker container can be started with `docker run` command, using the `--add-host` option to map the IAM server's IP on its FQDN. For example:
 
