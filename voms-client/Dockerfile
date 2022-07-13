@@ -17,7 +17,8 @@ name=EGI-trustanchors\n\
 baseurl=http://repository.egi.eu/sw/production/cas/1/current/\n\
 gpgcheck=0\n\
 enabled=1' | tee /etc/yum.repos.d/ca.repo && \
-    yum install -y ca-policy-egi-core voms-clients-java gettext && \
+    yum install -y ca-policy-egi-core voms-clients-java gettext \
+    python3-pip gfal2-all gfal2-util gfal2-python3 xrootd-client && \
     yum clean all && \
     rm -rf /var/cache/yum && \
     cp /etc/grid-security/certificates/*.pem /etc/pki/ca-trust/source/anchors/ && \
