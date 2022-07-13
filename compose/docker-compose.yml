@@ -95,7 +95,7 @@ services:
       IAM_VERS: ${IAM_VERSION:-v1.6.0}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
       IAM_BASE_URL: https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-      IAM_ISSUER: https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
+      IAM_ISSUER: https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}/
       IAM_USE_FORWARDED_HEADERS: "true"
       IAM_NOTIFICATION_DISABLE: "true"
       IAM_DB_HOST: ${MYSQL_DB:-db}
