@@ -37,7 +37,7 @@ services:
       HOST_PRIV_KEY: ${IAM_PRIV_KEY}
       HOST_CERT_URL: ${IAM_CERT_URL}
       IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-      
+
   trust:
     image: indigoiam/egi-trustanchors:latest
     container_name: trust
@@ -49,7 +49,7 @@ services:
         && /update-trust-anchors.sh
         && echo '# GEANT eScience Personal CA 4' | tee -a /etc/pki/tls/certs/ca-bundle.crt
         && cat /etc/grid-security/certificates/GEANTeSciencePersonalCA4.pem | tee -a /etc/pki/tls/certs/ca-bundle.crt
-        && nc -l 8086
+        && nc -k -l 8086
       "
 
     environment:
@@ -65,7 +65,7 @@ services:
     image: mysql:5.7
     volumes:
       - data:/var/lib/mysql
-    
+
     environment:
       TZ: Europe/Rome
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PWD:-pwd}
@@ -88,7 +88,7 @@ services:
          else echo 'IAM version '$$IAM_VERS' is not available'; fi
       "
 
-    environment: 
+    environment:
       TZ: Europe/Rome
       IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044 -Dspring.profiles.active=prod,registration
       IAM_JAVA_MEM_OPTS: -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
@@ -101,7 +101,7 @@ services:
       IAM_DB_HOST: ${MYSQL_DB:-db}
       IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
       IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
-  
+
     volumes:
       - scripts:/scripts
 
@@ -114,7 +114,7 @@ services:
     hostname: client
     environment:
       IAM_CLIENT_PORT: 8080
-    
+
   nginx-iam:
     image: indigoiam/nginx:latest
     container_name: nginx-iam
@@ -143,7 +143,7 @@ services:
     ports:
       - "443:443"
       - "80:80"
-    
+
     depends_on:
       - sidecar
 
@@ -168,7 +168,7 @@ services:
       IAM_DB_HOST: ${MYSQL_DB:-db}
       IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
       IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
-    
+
     volumes:
       - certs:/etc/grid-security/voms
       - trustanchors:/etc/grid-security/certificates
@@ -196,7 +196,7 @@ services:
       TZ: Europe/Rome
       VO: ${VO_NAME:-test.vo}
       X509_VOMS_DIR: /vomsdir
-      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}      
+      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
 
     volumes:
       - cabundle:/etc/pki
@@ -204,7 +204,7 @@ services:
       - certs:/certs
       - scripts:/scripts
       - conf.d:/etc/nginx/conf.d
-      
+
     depends_on:
       - sidecar
 
@@ -222,10 +222,10 @@ services:
         yum install -y epel-release
         && yum install -y voms-clients-java
         && mkdir -p /etc/grid-security/vomsdir/$$VO /etc/vomses /root/.globus
-        && if [[ ! -z \"$$CLIENT_CERT_URL\" ]]; then curl \"$${CLIENT_CERT_URL}\" -o /root/.globus/usercert.pem; 
+        && if [[ ! -z \"$$CLIENT_CERT_URL\" ]]; then curl \"$${CLIENT_CERT_URL}\" -o /root/.globus/usercert.pem;
            chmod 600 /root/.globus/usercert.pem;
            else echo \"WARNING\"':'\" certificate for VOMS client NOT set\"'!'; fi
-        && if [[ ! -z \"$$CLIENT_PRIV_KEY\" ]]; then echo $$CLIENT_PRIV_KEY | base64 -d | tee /root/.globus/userkey.pem; 
+        && if [[ ! -z \"$$CLIENT_PRIV_KEY\" ]]; then echo $$CLIENT_PRIV_KEY | base64 -d | tee /root/.globus/userkey.pem;
            chmod 400 /root/.globus/userkey.pem;
            else echo \"WARNING\"':'\" private key for VOMS client NOT set\"'!'; fi
         && /scripts/wait-for-it.sh -t 0 nginx-voms:443
