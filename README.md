@@ -17,7 +17,7 @@ A description of the role played by each Docker Compose service is reported here
 * `trust`: a CentOS 7 utility container that contains fetch-crl and other utilities to provide up-to-date trust anchors to relying applications.
 * `db`: a MySQL container starting a database where IAM will securely store its data.
 * `iam-be`: a container running the IAM login service Java application.
-* `nginx-iam`: an NGINX container that provides a reverse-proxy with SSL protecting the IAM login service.  
+* `nginx-iam`: an NGINX container that provides a reverse-proxy with SSL protecting the IAM login service.
 * `client`: an example OpenID Connect client application for IAM.
 * `nginx-voms`: an OpenResty VOMS container providing TLS termination and client VOMS attribute certificate parsing and validation, deployed as a service that protects the VOMS-AA.
 * `voms-aa`: a container running the VOMS Attribute Authority Java application.
