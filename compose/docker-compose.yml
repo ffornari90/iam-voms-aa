@@ -7,23 +7,61 @@ volumes:
   certs:
   scripts:
   conf.d:
+  letsencrypt:
+
+networks:
+  net:
 
 services:
+  proxy:
+    container_name: proxy
+    image: harbor.cloud.infn.it/cache/library/traefik:${TRAEFIK_VERSION}
+    volumes:
+      - letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /opt/storageservice/traefik:/config
+
+    links:
+      - "trust:trust"
+      - "iam-be:iam-be"
+      - "client:client"
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    command: /bin/sh -c "
+        while ! nc -z trust 8086 ; do sleep 1 ; done
+        && while ! nc -z iam-be 8080 ; do sleep 1 ; done
+        && while ! nc -z client 8080 ; do sleep 1 ; done
+        && traefik
+        --log.level=DEBUG
+        --api.insecure=true
+        --providers.docker=true
+        --providers.docker.exposedbydefault=false
+        --providers.file.directory=/config
+        --providers.file.watch=true
+        --entrypoints.web.address=:80
+        --entrypoints.websecure.address=:443
+        --entrypoints.web.http.redirections.entryPoint.to=websecure
+        --certificatesresolvers.myhttpchallenge.acme.httpchallenge=true
+        --certificatesresolvers.myhttpchallenge.acme.httpchallenge.entrypoint=web
+        --certificatesresolvers.myhttpchallenge.acme.email=${CONTACT_EMAIL}
+        --certificatesresolvers.myhttpchallenge.acme.storage=/letsencrypt/acme.json
+        --certificatesresolvers.myhttpchallenge.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+      "
+
+    networks:
+      - net
+
   sidecar:
     image: ffornari/sidecar:latest
     container_name: sidecar
     command: /bin/bash -c "
         cp /wait-for-it.sh /scripts
         && cp /application.yml /conf.d
-        && envsubst '$${IAM_HOST}' < /voms-ng.conf > /conf.d/voms-ng.conf
-        && if [[ ! -z \"$$HOST_PRIV_KEY\" ]]; then echo $$HOST_PRIV_KEY | base64 -d | tee /etc/ssl/certs/hostkey.pem;
-           else echo \"ERROR\"':'\" private key for IAM server NOT set\"'!'; fi
-        && if [[ ! -z \"$$HOST_CERT_URL\" ]]; then curl \"$${HOST_CERT_URL}\" -o /etc/ssl/certs/hostcert.pem;
-           export HOST_CERT_SUBJECT=$$(openssl x509 -in /etc/ssl/certs/hostcert.pem -noout -subject | awk -F\"subject= \" '{print $$2}');
-           export HOST_CERT_ISSUER=$$(openssl x509 -in /etc/ssl/certs/hostcert.pem -noout -issuer | awk -F\"issuer= \" '{print $$2}');
-           envsubst '$${VO},$${IAM_HOST},$${HOST_CERT_SUBJECT}' < /vomses.template > /conf.d/$$VO;
-           envsubst '$${HOST_CERT_SUBJECT},$${HOST_CERT_ISSUER}' < /lsc.template > /conf.d/$$IAM_HOST.lsc;
-           else echo \"ERROR\"':'\" certificate for IAM server NOT set\"'!'; fi
         && sleep infinity
       "
 
@@ -31,12 +69,16 @@ services:
       - scripts:/scripts
       - conf.d:/conf.d
       - certs:/etc/ssl/certs
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
 
     environment:
-      VO: ${VO_NAME:-test.vo}
-      HOST_PRIV_KEY: ${IAM_PRIV_KEY}
+      VO: ${VO_NAME}
       HOST_CERT_URL: ${IAM_CERT_URL}
-      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
+      IAM_HOST: ${HOST_PUBLIC_IP}.myip.cloud.infn.it
+
+    networks:
+      - net
 
   trust:
     image: indigoiam/egi-trustanchors:latest
@@ -58,6 +100,11 @@ services:
     volumes:
       - trustanchors:/etc/grid-security/certificates
       - cabundle:/etc/pki
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+
+    networks:
+      - net
 
   db:
     container_name: db
@@ -65,16 +112,20 @@ services:
     image: mysql:5.7
     volumes:
       - data:/var/lib/mysql
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
 
     environment:
-      TZ: Europe/Rome
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PWD:-pwd}
       MYSQL_USER: ${MYSQL_USERNAME:-iam}
       MYSQL_PASSWORD: ${MYSQL_PWD:-pwd}
       MYSQL_DATABASE: ${MYSQL_DB:-iam}
 
+    networks:
+      - net
+
   iam-be:
-    image: indigoiam/iam-login-service:${IAM_VERSION:-v1.6.0}
+    image: indigoiam/iam-login-service:${IAM_VERSION}
     container_name: iam-be
     hostname: iam-be
     links:
@@ -89,13 +140,12 @@ services:
       "
 
     environment:
-      TZ: Europe/Rome
       IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044 -Dspring.profiles.active=prod,registration
       IAM_JAVA_MEM_OPTS: -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
-      IAM_VERS: ${IAM_VERSION:-v1.6.0}
-      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-      IAM_BASE_URL: https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-      IAM_ISSUER: https://${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}/
+      IAM_VERS: ${IAM_VERSION}
+      IAM_HOST: ${HOST_PUBLIC_IP}.myip.cloud.infn.it
+      IAM_BASE_URL: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it
+      IAM_ISSUER: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it/
       IAM_USE_FORWARDED_HEADERS: "true"
       IAM_NOTIFICATION_DISABLE: "true"
       IAM_DB_HOST: ${MYSQL_DB:-db}
@@ -104,6 +154,23 @@ services:
 
     volumes:
       - scripts:/scripts
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.iam-redirect-ssl.redirectscheme.scheme=https"
+      - "traefik.http.routers.iam-nossl.middlewares=iam-redirect-ssl"
+      - "traefik.http.routers.iam-nossl.rule=Host(`${HOST_PUBLIC_IP}.myip.cloud.infn.it`)"
+      - "traefik.http.routers.iam-nossl.entrypoints=web"
+      - "traefik.http.routers.iam.rule=Host(`${HOST_PUBLIC_IP}.myip.cloud.infn.it`)"
+      - "traefik.http.routers.iam.entrypoints=websecure"
+      - "traefik.http.routers.iam.tls.certresolver=myhttpchallenge"
+      - "traefik.http.routers.iam.tls=true"
+      - "traefik.http.services.iam.loadbalancer.server.port=8080"
+
+    networks:
+      - net
 
     depends_on:
       - sidecar
@@ -114,138 +181,5 @@ services:
     hostname: client
     environment:
       IAM_CLIENT_PORT: 8080
-
-  nginx-iam:
-    image: indigoiam/nginx:latest
-    container_name: nginx-iam
-    hostname: nginx-iam
-    links:
-      - "trust:trust"
-      - "iam-be:iam-be"
-      - "client:client"
-
-    command: /bin/sh -c "
-        cp /certs/hostcert.pem /etc/ssl/certs/iam.cert.pem
-        && cp /certs/hostkey.pem /etc/ssl/private/iam.key.pem
-        && /scripts/wait-for-it.sh -t 0 trust:8086
-        && /scripts/wait-for-it.sh -t 0 iam-be:8080
-        && /scripts/wait-for-it.sh -t 0 client:8080
-        && nginx -g 'daemon off;'
-      "
-
-    volumes:
-      - certs:/certs
-      - scripts:/scripts
-
-    environment:
-      TZ: Europe/Rome
-
-    ports:
-      - "443:443"
-      - "80:80"
-
-    depends_on:
-      - sidecar
-
-  voms-aa:
-    image: indigoiam/voms-aa:latest
-    container_name: voms-aa
-    hostname: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-    links:
-      - "nginx-iam:nginx-iam"
-
-    entrypoint:
-      /bin/sh -c "
-        cp /conf.d/application.yml /app/resources/
-        && /scripts/wait-for-it.sh -t 0 nginx-iam:443
-        && java -cp @/app/jib-classpath-file it.infn.mw.voms.VomsService
-      "
-
-    environment:
-      TZ: Europe/Rome
-      VO: ${VO_NAME:-test.vo}
-      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-      IAM_DB_HOST: ${MYSQL_DB:-db}
-      IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
-      IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
-
-    volumes:
-      - certs:/etc/grid-security/voms
-      - trustanchors:/etc/grid-security/certificates
-      - scripts:/scripts
-      - conf.d:/conf.d
-
-    depends_on:
-      - sidecar
-
-  nginx-voms:
-    image: indigoiam/openresty-voms:latest
-    container_name: nginx-voms
-    links:
-      - "voms-aa:voms-aa"
-
-    command: /bin/sh -c "
-        /scripts/wait-for-it.sh -t 0 voms-aa:15000
-        && /usr/local/openresty-voms/nginx/sbin/nginx -g 'daemon off;'
-      "
-
-    ports:
-      - "15000:443"
-
-    environment:
-      TZ: Europe/Rome
-      VO: ${VO_NAME:-test.vo}
-      X509_VOMS_DIR: /vomsdir
-      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-
-    volumes:
-      - cabundle:/etc/pki
-      - trustanchors:/etc/grid-security/certificates
-      - certs:/certs
-      - scripts:/scripts
-      - conf.d:/etc/nginx/conf.d
-
-    depends_on:
-      - sidecar
-
-  voms-client:
-    image: centos:7
-    container_name: voms-client
-    hostname: voms-client
-    links:
-      - "nginx-voms:nginx-voms"
-
-    extra_hosts:
-      - "${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}:host-gateway"
-
-    command: /bin/bash -c "
-        yum install -y epel-release
-        && yum install -y voms-clients-java
-        && mkdir -p /etc/grid-security/vomsdir/$$VO /etc/vomses /root/.globus
-        && if [[ ! -z \"$$CLIENT_CERT_URL\" ]]; then curl \"$${CLIENT_CERT_URL}\" -o /root/.globus/usercert.pem;
-           chmod 600 /root/.globus/usercert.pem;
-           else echo \"WARNING\"':'\" certificate for VOMS client NOT set\"'!'; fi
-        && if [[ ! -z \"$$CLIENT_PRIV_KEY\" ]]; then echo $$CLIENT_PRIV_KEY | base64 -d | tee /root/.globus/userkey.pem;
-           chmod 400 /root/.globus/userkey.pem;
-           else echo \"WARNING\"':'\" private key for VOMS client NOT set\"'!'; fi
-        && /scripts/wait-for-it.sh -t 0 nginx-voms:443
-        && cp /conf.d/$$IAM_HOST.lsc /etc/grid-security/vomsdir/$$VO/
-        && cp /conf.d/$$VO /etc/vomses/
-        && sleep infinity
-      "
-
-    environment:
-      TZ: Europe/Rome
-      VO: ${VO_NAME:-test.vo}
-      CLIENT_PRIV_KEY: ${USER_PRIV_KEY}
-      CLIENT_CERT_URL: ${USER_CERT_URL}
-      IAM_HOST: ${IAM_FQDN:-iam-indigo.cr.cnaf.infn.it}
-
-    volumes:
-      - cabundle:/etc/pki
-      - trustanchors:/etc/grid-security/certificates
-      - scripts:/scripts
-      - conf.d:/conf.d
-
-    depends_on:
-      - sidecar
+    networks:
+      - net
