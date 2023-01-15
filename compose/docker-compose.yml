@@ -15,7 +15,7 @@ networks:
 services:
   proxy:
     container_name: proxy
-    image: harbor.cloud.infn.it/cache/library/traefik:${TRAEFIK_VERSION}
+    image: harbor.cloud.infn.it/cache/library/traefik:${TRAEFIK_VERSION:-latest}
     volumes:
       - letsencrypt:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -125,7 +125,7 @@ services:
       - net
 
   iam-be:
-    image: indigoiam/iam-login-service:${IAM_VERSION}
+    image: indigoiam/iam-login-service:${IAM_VERSION:-v1.8.0}
     container_name: iam-be
     hostname: iam-be
     links:
@@ -142,7 +142,7 @@ services:
     environment:
       IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044 -Dspring.profiles.active=prod,registration
       IAM_JAVA_MEM_OPTS: -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
-      IAM_VERS: ${IAM_VERSION}
+      IAM_VERS: ${IAM_VERSION:-v1.8.0}
       IAM_HOST: ${HOST_PUBLIC_IP}.myip.cloud.infn.it
       IAM_BASE_URL: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it
       IAM_ISSUER: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it/
