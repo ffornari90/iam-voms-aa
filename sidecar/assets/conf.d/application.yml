@@ -37,3 +37,5 @@ voms:
     host: ${IAM_HOST}
     port: ${server.port}
     vo-name: ${VO}
+    max-ac-lifetime-in-seconds: ${MAX_AC_LIFETIME}
+    optional-group-label: voms.role
