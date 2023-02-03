@@ -4,9 +4,10 @@ volumes:
   data:
   trustanchors:
   cabundle:
-  certs:
   scripts:
+  certs:
   conf.d:
+  config:
   letsencrypt:
 
 networks:
@@ -17,25 +18,18 @@ services:
     container_name: proxy
     image: harbor.cloud.infn.it/cache/library/traefik:${TRAEFIK_VERSION:-latest}
     volumes:
+      - cabundle:/etc/pki
       - letsencrypt:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
       - /opt/storageservice/traefik:/config
-
-    links:
-      - "trust:trust"
-      - "iam-be:iam-be"
-      - "client:client"
-
     ports:
       - "80:80"
       - "443:443"
-
     command: /bin/sh -c "
-        while ! nc -z trust 8086 ; do sleep 1 ; done
-        && while ! nc -z iam-be 8080 ; do sleep 1 ; done
-        && while ! nc -z client 8080 ; do sleep 1 ; done
+        while ! nc -z trust 8086; do sleep 1; done
+        && while ! nc -z iam-be 8080; do sleep 1; done
         && traefik
         --log.level=DEBUG
         --api.insecure=true
@@ -52,7 +46,6 @@ services:
         --certificatesresolvers.myhttpchallenge.acme.storage=/letsencrypt/acme.json
         --certificatesresolvers.myhttpchallenge.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
       "
-
     networks:
       - net
 
@@ -61,24 +54,32 @@ services:
     container_name: sidecar
     command: /bin/bash -c "
         cp /wait-for-it.sh /scripts
-        && cp /application.yml /conf.d
-        && sleep infinity
+        && cd /config
+        && openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST
+        && openssl pkcs12 -export -inkey self-signed.key.pem -name self-signed -in self-signed.cert.pem -out self-signed.p12 -password pass:$$SAML_JKS_PASSWORD
+        && keytool -importkeystore -destkeystore self-signed.jks -srckeystore self-signed.p12 -srcstoretype PKCS12 -storepass $$SAML_JKS_PASSWORD -srcstorepass $$SAML_JKS_PASSWORD
+        && while true; do output=$$(jq -r '.myhttpchallenge | .Certificates[] | select(.domain.main==\"'$$IAM_HOST'\") | .key'
+           /letsencrypt/acme.json 2>/dev/null | base64 -d | tee /certs/hostkey.pem);
+           if [[ -z \"$$output\" || $$? -ne 0 ]]; then sleep 5; else break; fi; done
+        && jq -r '.myhttpchallenge | .Certificates[] | select(.domain.main==\"'$$IAM_HOST'\") | .certificate'
+           /letsencrypt/acme.json | base64 -d > /certs/hostcert.pem
+        && nc -k -l 1337
       "
-
     volumes:
+      - letsencrypt:/letsencrypt
       - scripts:/scripts
       - conf.d:/conf.d
-      - certs:/etc/ssl/certs
+      - config:/config
+      - certs:/certs
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-
     environment:
-      VO: ${VO_NAME}
-      HOST_CERT_URL: ${IAM_CERT_URL}
       IAM_HOST: ${HOST_PUBLIC_IP}.myip.cloud.infn.it
-
+      SAML_JKS_PASSWORD: ${JKS_PASSWORD:-passwd}
     networks:
       - net
+    depends_on:
+      - proxy
 
   trust:
     image: indigoiam/egi-trustanchors:latest
@@ -93,34 +94,29 @@ services:
         && cat /etc/grid-security/certificates/GEANTeSciencePersonalCA4.pem | tee -a /etc/pki/tls/certs/ca-bundle.crt
         && nc -k -l 8086
       "
-
     environment:
       FORCE_TRUST_ANCHORS_UPDATE: 1
-
     volumes:
       - trustanchors:/etc/grid-security/certificates
       - cabundle:/etc/pki
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-
     networks:
       - net
 
   db:
     container_name: db
     hostname: db
-    image: mysql:5.7
+    image: mariadb:latest
     volumes:
       - data:/var/lib/mysql
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PWD:-pwd}
       MYSQL_USER: ${MYSQL_USERNAME:-iam}
       MYSQL_PASSWORD: ${MYSQL_PWD:-pwd}
       MYSQL_DATABASE: ${MYSQL_DB:-iam}
-
     networks:
       - net
 
@@ -128,50 +124,91 @@ services:
     image: indigoiam/iam-login-service:${IAM_VERSION:-v1.8.0}
     container_name: iam-be
     hostname: iam-be
-    links:
-      - "db:db"
-
     command: /bin/bash -c "
         /scripts/wait-for-it.sh -t 0 db:3306
-        && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
-         elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -jar iam-login-service.war;
-         elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then java $$IAM_JAVA_OPTS org.springframework.boot.loader.WarLauncher;
+        && while true; do if [ ! -s /config/self-signed.jks ]; then sleep 5; else break; fi; done
+        && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
+         elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
+         elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then apt update; apt install -y zip;
+         zip -d /indigo-iam/WEB-INF/lib/angular-ui-bootstrap-2.5.6.jar META-INF/resources/webjars/angular-ui-bootstrap/2.5.6/dist/.DS\_Store;
+         java $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES  org.springframework.boot.loader.WarLauncher;
          else echo 'IAM version '$$IAM_VERS' is not available'; fi
       "
-
     environment:
-      IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044 -Dspring.profiles.active=prod,registration
+      IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044
+      IAM_ACTIVE_PROFILES: ${ACTIVE_PROFILES:-prod,registration}
       IAM_JAVA_MEM_OPTS: -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
       IAM_VERS: ${IAM_VERSION:-v1.8.0}
       IAM_HOST: ${HOST_PUBLIC_IP}.myip.cloud.infn.it
       IAM_BASE_URL: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it
       IAM_ISSUER: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it/
-      IAM_USE_FORWARDED_HEADERS: "true"
-      IAM_NOTIFICATION_DISABLE: "true"
       IAM_DB_HOST: ${MYSQL_DB:-db}
       IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
       IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
-
+      IAM_ACCESS_TOKEN_INCLUDE_AUTHN_INFO: ${ACCESS_TOKEN_INCLUDE_AUTHN_INFO:-true}
+      IAM_ACCESS_TOKEN_INCLUDE_NBF: ${ACCESS_TOKEN_INCLUDE_NBF:-true}
+      IAM_ACCESS_TOKEN_INCLUDE_SCOPE: ${ACCESS_TOKEN_INCLUDE_SCOPE:-true}
+      IAM_JWT_DEFAULT_PROFILE: ${JWT_DEFAULT_PROFILE:-iam}
+      IAM_FORWARD_HEADERS_STRATEGY: "native"
+      IAM_NOTIFICATION_DISABLE: ${NOTIFICATION_DISABLE:-false}
+      IAM_ORGANISATION_NAME: ${ORGANISATION_NAME:-indigo-dc}
+      IAM_MAIL_HOST: ${MAIL_HOST:-smtp-cc.infn.it}
+      IAM_MAIL_PORT: ${MAIL_PORT:-587}
+      IAM_MAIL_USERNAME: ${MAIL_USERNAME:-mail}
+      IAM_MAIL_PASSWORD: ${MAIL_PASSWORD:-pwd}
+      IAM_NOTIFICATION_FROM: ${NOTIFICATION_FROM:-admin@local.io}
+      IAM_NOTIFICATION_ADMIN_ADDRESS: ${NOTIFICATION_ADMIN_ADDRESS:-admin@local.io}
+      IAM_SAML_ENTITY_ID: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it
+      IAM_SAML_KEYSTORE: file:///config/self-signed.jks
+      IAM_SAML_KEYSTORE_PASSWORD: ${SAML_KEYSTORE_PASSWORD:-pwd}
+      IAM_SAML_KEY_ID: ${SAML_KEY_ID:-self-signed-saml}
+      IAM_SAML_KEY_PASSWORD: ${SAML_KEY_PASSWORD:-pwd}
+      IAM_SAML_ID_RESOLVERS: ${SAML_ID_RESOLVERS:-eduPersonUniqueId,eduPersonTargetedId,eduPersonPrincipalName}
+      IAM_SAML_METADATA_LOOKUP_SERVICE_REFRESH_PERIOD_SEC: ${SAML_METADATA_LOOKUP_SERVICE_REFRESH_PERIOD_SEC:-3600}
+      IAM_SAML_LOGIN_BUTTON_TEXT: ${SAML_LOGIN_BUTTON_TEXT:-"Sign in with INFN AAI"}
+      IAM_SAML_IDP_METADATA: ${SAML_IDP_METADATA:-https://idp.infn.it/saml2/idp/metadata.php}
+      IAM_SAML_METADATA_REQUIRE_VALID_SIGNATURE: ${SAML_METADATA_REQUIRE_VALID_SIGNATURE:-false}
+      IAM_SAML_METADATA_REQUIRE_SIRTFI: ${SAML_METADATA_REQUIRE_SIRTFI:-false}
     volumes:
+      - config:/config
       - scripts:/scripts
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.middlewares.iam-redirect-ssl.redirectscheme.scheme=https"
-      - "traefik.http.routers.iam-nossl.middlewares=iam-redirect-ssl"
-      - "traefik.http.routers.iam-nossl.rule=Host(`${HOST_PUBLIC_IP}.myip.cloud.infn.it`)"
-      - "traefik.http.routers.iam-nossl.entrypoints=web"
-      - "traefik.http.routers.iam.rule=Host(`${HOST_PUBLIC_IP}.myip.cloud.infn.it`)"
-      - "traefik.http.routers.iam.entrypoints=websecure"
-      - "traefik.http.routers.iam.tls.certresolver=myhttpchallenge"
-      - "traefik.http.routers.iam.tls=true"
-      - "traefik.http.services.iam.loadbalancer.server.port=8080"
-
     networks:
       - net
+    depends_on:
+      - sidecar
 
+  nginx-iam:
+    image: indigoiam/nginx:latest
+    container_name: nginx-iam
+    hostname: nginx-iam
+    command: /bin/sh -c "
+        /scripts/wait-for-it.sh -t 0 sidecar:1337
+        && cp /certs/hostcert.pem /etc/ssl/certs/iam.cert.pem
+        && cp /certs/hostkey.pem /etc/ssl/private/iam.key.pem
+        && /scripts/wait-for-it.sh -t 0 trust:8086
+        && cp /etc/pki/tls/certs/ca-bundle.crt /usr/local/share/ca-certificates/
+        && update-ca-certificates
+        && /scripts/wait-for-it.sh -t 0 iam-be:8080
+        && /scripts/wait-for-it.sh -t 0 client:8080
+        && nginx -g 'daemon off;'
+      "
+    volumes:
+      - certs:/certs
+      - scripts:/scripts
+      - cabundle:/etc/pki
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.iam.rule=HostSNI(`${HOST_PUBLIC_IP}.myip.cloud.infn.it`)"
+      - "traefik.tcp.routers.iam.tls.passthrough=true"
+      - "traefik.tcp.routers.iam.tls.certresolver=myhttpchallenge"
+      - "traefik.tcp.routers.iam.entrypoints=websecure"
+      - "traefik.tcp.services.iam.loadbalancer.server.port=443"
+    networks:
+      - net
     depends_on:
       - sidecar
 
