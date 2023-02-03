@@ -53,7 +53,8 @@ services:
     image: ffornari/sidecar:latest
     container_name: sidecar
     command: /bin/bash -c "
-        cp /wait-for-it.sh /scripts
+        cp /wait-for-it.sh /scripts/
+        && cp /smtp.yml /config/
         && cd /config
         && if [ ! -f /config/self-signed.jks ]; then openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST
         && openssl pkcs12 -export -inkey self-signed.key.pem -name self-signed -in self-signed.cert.pem -out self-signed.p12 -password pass:$$SAML_JKS_PASSWORD
@@ -124,16 +125,18 @@ services:
     image: indigoiam/iam-login-service:${IAM_VERSION:-v1.8.0}
     container_name: iam-be
     hostname: iam-be
-    command: /bin/bash -c "
+    command: "/bin/bash -c \"
         /scripts/wait-for-it.sh -t 0 db:3306
+        && while true; do if [ ! -s /config/smtp.yml ]; then sleep 5; else break; fi; done
+        && sed -i '/    password: $${IAM_MAIL_PASSWORD:}/ r /config/smtp.yml' /indigo-iam/WEB-INF/classes/application.yml
         && while true; do if [ ! -s /config/self-signed.jks ]; then sleep 5; else break; fi; done
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
-         elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then apt update; apt install -y zip; 
-         zip -d /indigo-iam/WEB-INF/lib/angular-ui-bootstrap-2.5.6.jar META-INF/resources/webjars/angular-ui-bootstrap/2.5.6/dist/.DS\_Store; 
+         elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then apt update; apt install -y zip;
+         zip -d /indigo-iam/WEB-INF/lib/angular-ui-bootstrap-2.5.6.jar META-INF/resources/webjars/angular-ui-bootstrap/2.5.6/dist/.DS_Store;
          java $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES  org.springframework.boot.loader.WarLauncher;
          else echo 'IAM version '$$IAM_VERS' is not available'; fi
-      "
+      \""
     environment:
       IAM_JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -Xdebug -Xrunjdwp:server=y,transport=dt_socket,suspend=n,address=1044
       IAM_ACTIVE_PROFILES: ${ACTIVE_PROFILES:-prod,registration}
