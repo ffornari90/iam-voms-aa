@@ -55,9 +55,9 @@ services:
     command: /bin/bash -c "
         cp /wait-for-it.sh /scripts
         && cd /config
-        && openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST
+        && if [ ! -f /config/self-signed.jks ]; then openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST
         && openssl pkcs12 -export -inkey self-signed.key.pem -name self-signed -in self-signed.cert.pem -out self-signed.p12 -password pass:$$SAML_JKS_PASSWORD
-        && keytool -importkeystore -destkeystore self-signed.jks -srckeystore self-signed.p12 -srcstoretype PKCS12 -storepass $$SAML_JKS_PASSWORD -srcstorepass $$SAML_JKS_PASSWORD
+        && keytool -importkeystore -destkeystore self-signed.jks -srckeystore self-signed.p12 -srcstoretype PKCS12 -storepass $$SAML_JKS_PASSWORD -srcstorepass $$SAML_JKS_PASSWORD; fi
         && while true; do output=$$(jq -r '.myhttpchallenge | .Certificates[] | select(.domain.main==\"'$$IAM_HOST'\") | .key'
            /letsencrypt/acme.json 2>/dev/null | base64 -d | tee /certs/hostkey.pem);
            if [[ -z \"$$output\" || $$? -ne 0 ]]; then sleep 5; else break; fi; done
@@ -129,8 +129,8 @@ services:
         && while true; do if [ ! -s /config/self-signed.jks ]; then sleep 5; else break; fi; done
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
-         elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then apt update; apt install -y zip;
-         zip -d /indigo-iam/WEB-INF/lib/angular-ui-bootstrap-2.5.6.jar META-INF/resources/webjars/angular-ui-bootstrap/2.5.6/dist/.DS\_Store;
+         elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then apt update; apt install -y zip; 
+         zip -d /indigo-iam/WEB-INF/lib/angular-ui-bootstrap-2.5.6.jar META-INF/resources/webjars/angular-ui-bootstrap/2.5.6/dist/.DS\_Store; 
          java $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES  org.springframework.boot.loader.WarLauncher;
          else echo 'IAM version '$$IAM_VERS' is not available'; fi
       "
@@ -152,6 +152,11 @@ services:
       IAM_FORWARD_HEADERS_STRATEGY: "native"
       IAM_NOTIFICATION_DISABLE: ${NOTIFICATION_DISABLE:-false}
       IAM_ORGANISATION_NAME: ${ORGANISATION_NAME:-indigo-dc}
+      IAM_LOGO_URL: ${LOGO_URL:-resources/images/indigo-logo.png}
+      IAM_LOGO_DIMENSION: ${LOGO_DIMENSION:-200}
+      IAM_LOGO_HEIGTH: ${LOGO_HEIGTH:-150}
+      IAM_LOGO_WIDTH: ${LOGO_WIDTH:-200}
+      IAM_TOPBAR_TITLE: "INDIGO IAM for ${ORGANISATION_NAME:-indigo-dc}"
       IAM_MAIL_HOST: ${MAIL_HOST:-smtp-cc.infn.it}
       IAM_MAIL_PORT: ${MAIL_PORT:-587}
       IAM_MAIL_USERNAME: ${MAIL_USERNAME:-mail}
