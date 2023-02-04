@@ -30,21 +30,23 @@ services:
     command: /bin/sh -c "
         while ! nc -z trust 8086; do sleep 1; done
         && while ! nc -z iam-be 8080; do sleep 1; done
-        && traefik
-        --log.level=DEBUG
-        --api.insecure=true
-        --providers.docker=true
-        --providers.docker.exposedbydefault=false
-        --providers.file.directory=/config
-        --providers.file.watch=true
-        --entrypoints.web.address=:80
-        --entrypoints.websecure.address=:443
-        --entrypoints.web.http.redirections.entryPoint.to=websecure
-        --certificatesresolvers.myhttpchallenge.acme.httpchallenge=true
-        --certificatesresolvers.myhttpchallenge.acme.httpchallenge.entrypoint=web
-        --certificatesresolvers.myhttpchallenge.acme.email=${CONTACT_EMAIL}
-        --certificatesresolvers.myhttpchallenge.acme.storage=/letsencrypt/acme.json
-        --certificatesresolvers.myhttpchallenge.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+        && common_options=\"--log.level=DEBUG 
+        --api.insecure=true 
+        --providers.docker=true 
+        --providers.docker.exposedbydefault=false 
+        --providers.file.directory=/config 
+        --providers.file.watch=true 
+        --entrypoints.web.address=:80 
+        --entrypoints.websecure.address=:443 
+        --entrypoints.web.http.redirections.entryPoint.to=websecure 
+        --certificatesresolvers.myhttpchallenge.acme.httpchallenge=true 
+        --certificatesresolvers.myhttpchallenge.acme.httpchallenge.entrypoint=web 
+        --certificatesresolvers.myhttpchallenge.acme.email=${CONTACT_EMAIL} 
+        --certificatesresolvers.myhttpchallenge.acme.storage=/letsencrypt/acme.json\"
+        && if [ \"$LETSENCRYPT_TEST\" == \"true\" ]; then
+        options=\"$$common_options --certificatesresolvers.myhttpchallenge.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory\";
+        else options=\"$$common_options\"; fi
+        && traefik $$options
       "
     networks:
       - net
@@ -165,7 +167,7 @@ services:
       IAM_MAIL_PORT: ${MAIL_PORT:-587}
       IAM_MAIL_USERNAME: ${MAIL_USERNAME:-mail}
       IAM_MAIL_PASSWORD: ${MAIL_PASSWORD:-pwd}
-      IAM_NOTIFICATION_FROM: ${NOTIFICATION_FROM:-admin@local.io}
+      IAM_NOTIFICATION_FROM: ${NOTIFICATION_FROM:-admin}
       IAM_NOTIFICATION_ADMIN_ADDRESS: ${NOTIFICATION_ADMIN_ADDRESS:-admin@local.io}
       IAM_SAML_ENTITY_ID: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it
       IAM_SAML_KEYSTORE: file:///config/self-signed.jks
