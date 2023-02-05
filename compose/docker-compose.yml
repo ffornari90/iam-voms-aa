@@ -180,6 +180,7 @@ services:
       IAM_SAML_IDP_METADATA: ${SAML_IDP_METADATA:-https://idp.infn.it/saml2/idp/metadata.php}
       IAM_SAML_METADATA_REQUIRE_VALID_SIGNATURE: ${SAML_METADATA_REQUIRE_VALID_SIGNATURE:-false}
       IAM_SAML_METADATA_REQUIRE_SIRTFI: ${SAML_METADATA_REQUIRE_SIRTFI:-false}
+      IAM_LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY: ${LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY:-visible}
     volumes:
       - config:/config
       - scripts:/scripts
