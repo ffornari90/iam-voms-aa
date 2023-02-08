@@ -58,9 +58,8 @@ services:
         cp /wait-for-it.sh /scripts/
         && cp /smtp.yml /config/
         && cd /config
-        && if [ ! -f /config/self-signed.jks ]; then openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST
-        && openssl pkcs12 -export -inkey self-signed.key.pem -name self-signed -in self-signed.cert.pem -out self-signed.p12 -password pass:$$IAM_SAML_KEY_PASSWORD
-        && keytool -importkeystore -destkeystore self-signed.jks -srckeystore self-signed.p12 -srcstoretype PKCS12 -storepass $$IAM_SAML_KEYSTORE_PASSWORD -srcstorepass $$IAM_SAML_KEY_PASSWORD; fi
+        && if [ ! -f /config/self-signed.key.pem ]; then openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST; fi
+        && if [ ! -f /config/self-signed.p12 ]; then openssl pkcs12 -export -inkey self-signed.key.pem -name self-signed -in self-signed.cert.pem -out self-signed.p12 -password pass:$$IAM_SAML_KEY_PASSWORD; fi
         && while true; do output=$$(jq -r '.myhttpchallenge | .Certificates[] | select(.domain.main==\"'$$IAM_HOST'\") | .key'
            /letsencrypt/acme.json 2>/dev/null | base64 -d | tee /certs/hostkey.pem);
            if [[ -z \"$$output\" || $$? -ne 0 ]]; then sleep 5; else break; fi; done
@@ -78,8 +77,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
     environment:
       IAM_HOST: ${DNS_NAME}
-      IAM_SAML_KEY_PASSWORD: ${SAML_KEY_PASSWORD:-passwd}
-      IAM_SAML_KEYSTORE_PASSWORD: ${SAML_KEYSTORE_PASSWORD:-passwd}
+      IAM_SAML_KEY_PASSWORD: ${SAML_KEY_PASSWORD:-changeit}
     networks:
       - net
     depends_on:
@@ -130,9 +128,13 @@ services:
     hostname: iam-be
     command: "/bin/bash -c \"
         /scripts/wait-for-it.sh -t 0 db:3306
+        && curl $$IAM_SAML_IDP_CERT_URL -o /usr/local/share/ca-certificates/idp.crt
+        && update-ca-certificates
+        && openssl x509 -outform der -in /usr/local/share/ca-certificates/idp.crt -out idp.der
+        && if [ ! -f /config/self-signed.jks ]; then keytool -importkeystore -destkeystore /config/self-signed.jks -srckeystore /config/self-signed.p12 -srcstoretype PKCS12 -storepass $$IAM_SAML_KEYSTORE_PASSWORD -srcstorepass $$IAM_SAML_KEY_PASSWORD
+        && keytool -import -alias idp -file idp.der -keystore /config/self-signed.jks -storepass $$IAM_SAML_KEYSTORE_PASSWORD -noprompt; fi
         && while true; do if [ ! -s /config/smtp.yml ]; then sleep 5; else break; fi; done
         && sed -i '/    password: $${IAM_MAIL_PASSWORD:}/ r /config/smtp.yml' /indigo-iam/WEB-INF/classes/application.yml
-        && while true; do if [ ! -s /config/self-signed.jks ]; then sleep 5; else break; fi; done
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then apt update; apt install -y zip;
@@ -171,16 +173,18 @@ services:
       IAM_NOTIFICATION_ADMIN_ADDRESS: ${NOTIFICATION_ADMIN_ADDRESS:-admin@local.io}
       IAM_SAML_ENTITY_ID: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it
       IAM_SAML_KEYSTORE: file:///config/self-signed.jks
-      IAM_SAML_KEYSTORE_PASSWORD: ${SAML_KEYSTORE_PASSWORD:-passwd}
+      IAM_SAML_KEYSTORE_PASSWORD: ${SAML_KEYSTORE_PASSWORD:-changeit}
       IAM_SAML_KEY_ID: ${SAML_KEY_ID:-self-signed}
-      IAM_SAML_KEY_PASSWORD: ${SAML_KEY_PASSWORD:-passwd}
+      IAM_SAML_KEY_PASSWORD: ${SAML_KEY_PASSWORD:-changeit}
       IAM_SAML_ID_RESOLVERS: ${SAML_ID_RESOLVERS:-eduPersonUniqueId,eduPersonTargetedId,eduPersonPrincipalName}
       IAM_SAML_METADATA_LOOKUP_SERVICE_REFRESH_PERIOD_SEC: ${SAML_METADATA_LOOKUP_SERVICE_REFRESH_PERIOD_SEC:-3600}
       IAM_SAML_LOGIN_BUTTON_TEXT: ${SAML_LOGIN_BUTTON_TEXT:-Sign in with INFN AAI}
       IAM_SAML_IDP_METADATA: ${SAML_IDP_METADATA:-https://idp.infn.it/saml2/idp/metadata.php}
+      IAM_SAML_IDP_CERT_URL: ${SAML_IDP_CERT_URL:-https://idp.infn.it/module.php/saml/idp/certs.php/idp.crt}
       IAM_SAML_METADATA_REQUIRE_VALID_SIGNATURE: ${SAML_METADATA_REQUIRE_VALID_SIGNATURE:-false}
       IAM_SAML_METADATA_REQUIRE_SIRTFI: ${SAML_METADATA_REQUIRE_SIRTFI:-false}
       IAM_LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY: ${LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY:-visible}
+      IAM_LOCAL_AUTHN_ENABLED_FOR: ${LOCAL_AUTHN_ENABLED_FOR:-all}
     volumes:
       - config:/config
       - scripts:/scripts
