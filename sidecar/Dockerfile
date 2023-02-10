@@ -4,7 +4,7 @@ COPY ./assets/conf.d/vomses.template /
 COPY ./assets/conf.d/lsc.template /
 COPY ./assets/conf.d/voms-ng.conf /
 COPY ./assets/conf.d/application.yml /
-COPY ./assets/conf.d/smtp.yml /
+COPY ./assets/conf.d/iam-application.yml /
 RUN yum install -y epel-release && \
     yum clean all && \
     rm -rf /var/cache/yum && \
@@ -15,4 +15,5 @@ RUN yum install -y epel-release && \
 CMD ["/bin/sh", "-c", "cp /wait-for-it.sh /scripts \
     && cp /voms-ng.conf /conf.d \
     && cp /application.yml /conf.d \
+    && cp /iam-application.yml /conf.d \
     && sleep infinity"]
