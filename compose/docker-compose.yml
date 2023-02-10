@@ -23,7 +23,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-      - /opt/storageservice/traefik:/config
+      - /opt/traefik:/config
     ports:
       - "80:80"
       - "443:443"
@@ -56,7 +56,7 @@ services:
     container_name: sidecar
     command: /bin/bash -c "
         cp /wait-for-it.sh /scripts/
-        && cp /smtp.yml /config/
+        && cp /iam-application.yml /config/
         && cd /config
         && if [ ! -f /config/self-signed.key.pem ]; then openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST; fi
         && if [ ! -f /config/self-signed.p12 ]; then openssl pkcs12 -export -inkey self-signed.key.pem -name self-signed -in self-signed.cert.pem -out self-signed.p12 -password pass:$$IAM_SAML_KEY_PASSWORD; fi
@@ -116,9 +116,9 @@ services:
       - /etc/localtime:/etc/localtime:ro
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PWD:-pwd}
-      MYSQL_USER: ${MYSQL_USERNAME:-iam}
-      MYSQL_PASSWORD: ${MYSQL_PWD:-pwd}
-      MYSQL_DATABASE: ${MYSQL_DB:-iam}
+      MYSQL_USER: ${DB_USERNAME:-iam}
+      MYSQL_PASSWORD: ${DB_PWD:-pwd}
+      MYSQL_DATABASE: ${DB_NAME:-iam}
     networks:
       - net
 
@@ -133,8 +133,8 @@ services:
         && openssl x509 -outform der -in /usr/local/share/ca-certificates/idp.crt -out idp.der
         && if [ ! -f /config/self-signed.jks ]; then keytool -importkeystore -destkeystore /config/self-signed.jks -srckeystore /config/self-signed.p12 -srcstoretype PKCS12 -storepass $$IAM_SAML_KEYSTORE_PASSWORD -srcstorepass $$IAM_SAML_KEY_PASSWORD
         && keytool -import -alias idp -file idp.der -keystore /config/self-signed.jks -storepass $$IAM_SAML_KEYSTORE_PASSWORD -noprompt; fi
-        && while true; do if [ ! -s /config/smtp.yml ]; then sleep 5; else break; fi; done
-        && sed -i '/    password: $${IAM_MAIL_PASSWORD:}/ r /config/smtp.yml' /indigo-iam/WEB-INF/classes/application.yml
+        && while true; do if [ ! -s /config/iam-application.yml ]; then sleep 5; else break; fi; done
+        && cp /config/iam-application.yml /indigo-iam/WEB-INF/classes/application.yml
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.7.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
          elif [[ $$IAM_VERS =~ \"v1.8.\" ]]; then apt update; apt install -y zip;
@@ -147,49 +147,103 @@ services:
       IAM_ACTIVE_PROFILES: ${ACTIVE_PROFILES:-prod,registration}
       IAM_JAVA_MEM_OPTS: -XX:MaxRAMFraction=1 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap
       IAM_VERS: ${IAM_VERSION:-v1.8.0}
+      # Basic service configuration
       IAM_HOST: ${DNS_NAME}
       IAM_BASE_URL: https://${DNS_NAME}
       IAM_ISSUER: https://${DNS_NAME}/
-      IAM_DB_HOST: ${MYSQL_DB:-db}
-      IAM_DB_USERNAME: ${MYSQL_USERNAME:-iam}
-      IAM_DB_PASSWORD: ${MYSQL_PWD:-pwd}
-      IAM_ACCESS_TOKEN_INCLUDE_AUTHN_INFO: ${ACCESS_TOKEN_INCLUDE_AUTHN_INFO:-true}
-      IAM_ACCESS_TOKEN_INCLUDE_NBF: ${ACCESS_TOKEN_INCLUDE_NBF:-true}
-      IAM_ACCESS_TOKEN_INCLUDE_SCOPE: ${ACCESS_TOKEN_INCLUDE_SCOPE:-true}
-      IAM_JWT_DEFAULT_PROFILE: ${JWT_DEFAULT_PROFILE:-iam}
-      IAM_FORWARD_HEADERS_STRATEGY: "native"
-      IAM_NOTIFICATION_DISABLE: ${NOTIFICATION_DISABLE:-false}
+      IAM_KEY_STORE_LOCATION: ${KEY_STORE_LOCATION:-/indigo-iam/WEB-INF/classes/keystore.jwks}
+      IAM_JWK_CACHE_LIFETIME: ${JWK_CACHE_LIFETIME:-21600}
+      IAM_X509_TRUST_ANCHORS_DIR: ${X509_TRUST_ANCHORS_DIR:-/etc/grid-security/certificates}
+      IAM_X509_TRUST_ANCHORS_REFRESH: ${X509_TRUST_ANCHORS_REFRESH:-14400}
+      IAM_FORWARD_HEADERS_STRATEGY: ${FORWARD_HEADERS_STRATEGY:-native}
+      IAM_TOMCAT_ACCESS_LOG_ENABLED: ${TOMCAT_ACCESS_LOG_ENABLED:-false}
+      IAM_TOMCAT_ACCESS_LOG_DIRECTORY: ${TOMCAT_ACCESS_LOG_DIRECTORY:-/tmp}
+      IAM_ACTUATOR_USER_USERNAME: ${ACTUATOR_USER_USERNAME:-user}
+      IAM_ACTUATOR_USER_PASSWORD: ${ACTUATOR_USER_PASSWORD:-secret}
+      IAM_LOCAL_RESOURCES_ENABLE: ${LOCAL_RESOURCES_ENABLE:-false}
+      IAM_LOCAL_RESOURCES_LOCATION: ${LOCAL_RESOURCES_LOCATION:-file:/indigo-iam/local-resources}
+      # Organisation configuration
       IAM_ORGANISATION_NAME: ${ORGANISATION_NAME:-indigo-dc}
       IAM_LOGO_URL: ${LOGO_URL:-resources/images/indigo-logo.png}
       IAM_LOGO_DIMENSION: ${LOGO_DIMENSION:-200}
       IAM_LOGO_HEIGTH: ${LOGO_HEIGTH:-150}
       IAM_LOGO_WIDTH: ${LOGO_WIDTH:-200}
       IAM_TOPBAR_TITLE: "INDIGO IAM for ${ORGANISATION_NAME:-indigo-dc}"
-      IAM_MAIL_HOST: ${MAIL_HOST:-smtp-cc.infn.it}
-      IAM_MAIL_PORT: ${MAIL_PORT:-587}
-      IAM_MAIL_USERNAME: ${MAIL_USERNAME:-mail}
-      IAM_MAIL_PASSWORD: ${MAIL_PASSWORD:-pwd}
-      IAM_NOTIFICATION_FROM: ${NOTIFICATION_FROM:-admin}
-      IAM_NOTIFICATION_ADMIN_ADDRESS: ${NOTIFICATION_ADMIN_ADDRESS:-admin@local.io}
+      # Access token contents configuration
+      IAM_ACCESS_TOKEN_INCLUDE_AUTHN_INFO: ${ACCESS_TOKEN_INCLUDE_AUTHN_INFO:-true}
+      IAM_ACCESS_TOKEN_INCLUDE_NBF: ${ACCESS_TOKEN_INCLUDE_NBF:-true}
+      IAM_ACCESS_TOKEN_INCLUDE_SCOPE: ${ACCESS_TOKEN_INCLUDE_SCOPE:-true}
+      # Database configuration
+      IAM_DB_HOST: ${DB_HOST:-db}
+      IAM_DB_PORT: ${DB_PORT:-3306}
+      IAM_DB_NAME: ${DB_NAME:-iam}
+      IAM_DB_USERNAME: ${DB_USERNAME:-iam}
+      IAM_DB_PASSWORD: ${DB_PWD:-pwd}
+      IAM_DB_MAX_ACTIVE: ${DB_MAX_ACTIVE:-50}
+      IAM_DB_MAX_IDLE: ${DB_MAX_IDLE:-5}
+      IAM_DB_INITIAL_SIZE: ${DB_INITIAL_SIZE:-8}
+      IAM_DB_TEST_WHILE_IDLE: ${DB_TEST_WHILE_IDLE:-true}
+      IAM_DB_TEST_ON_BORROW: ${DB_TEST_ON_BORROW:-true}
+      IAM_DB_VALIDATION_QUERY: ${DB_VALIDATION_QUERY:-SELECT 1}
+      IAM_DB_TIME_BETWEEN_EVICTION_RUNS_MILLIS: ${DB_TIME_BETWEEN_EVICTION_RUNS_MILLIS:-5000}
+      IAM_DB_MIN_EVICTABLE_IDLE_TIME_MILLIS: ${DB_MIN_EVICTABLE_IDLE_TIME_MILLIS:-60000}
+      # Test Client configuration
+      IAM_CLIENT_ID: ${CLIENT_ID:-client}
+      IAM_CLIENT_SECRET: ${CLIENT_SECRET:-secret}
+      IAM_CLIENT_SCOPES: ${CLIENT_SCOPES:-openid profile email}
+      IAM_CLIENT_FORWARD_HEADERS_STRATEGY: ${CLIENT_FORWARD_HEADERS_STRATEGY:-none}
+      # Redis configuration
+      IAM_SPRING_REDIS_HOST: ${SPRING_REDIS_HOST:-localhost}
+      IAM_SPRING_REDIS_PORT: ${SPRING_REDIS_PORT:-6397}
+      IAM_SPRING_REDIS_PASSWORD: ${SPRING_REDIS_PASSWORD:-secret}
+      IAM_SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-1800}
+      IAM_SPRING_SESSION_STORE_TYPE: ${SPRING_SESSION_STORE_TYPE:-none}
+      IAM_HEALTH_REDIS_PROBE_ENABLED: ${HEALTH_REDIS_PROBE_ENABLED:-false}
+      # Local authentication settings 
+      IAM_LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY: ${LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY:-visible}
+      IAM_LOCAL_AUTHN_ENABLED_FOR: ${LOCAL_AUTHN_ENABLED_FOR:-all}
+      # Google authentication settings
+      IAM_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      IAM_GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # SAML authentication settings 
       IAM_SAML_ENTITY_ID: https://${HOST_PUBLIC_IP}.myip.cloud.infn.it
+      IAM_SAML_LOGIN_BUTTON_TEXT: ${SAML_LOGIN_BUTTON_TEXT:-Sign in with INFN AAI}
       IAM_SAML_KEYSTORE: file:///config/self-signed.jks
       IAM_SAML_KEYSTORE_PASSWORD: ${SAML_KEYSTORE_PASSWORD:-changeit}
       IAM_SAML_KEY_ID: ${SAML_KEY_ID:-self-signed}
       IAM_SAML_KEY_PASSWORD: ${SAML_KEY_PASSWORD:-changeit}
-      IAM_SAML_ID_RESOLVERS: ${SAML_ID_RESOLVERS:-eduPersonUniqueId,eduPersonTargetedId,eduPersonPrincipalName}
-      IAM_SAML_METADATA_LOOKUP_SERVICE_REFRESH_PERIOD_SEC: ${SAML_METADATA_LOOKUP_SERVICE_REFRESH_PERIOD_SEC:-3600}
-      IAM_SAML_LOGIN_BUTTON_TEXT: ${SAML_LOGIN_BUTTON_TEXT:-Sign in with INFN AAI}
       IAM_SAML_IDP_METADATA: ${SAML_IDP_METADATA:-https://idp.infn.it/saml2/idp/metadata.php}
       IAM_SAML_IDP_CERT_URL: ${SAML_IDP_CERT_URL:-https://idp.infn.it/module.php/saml/idp/certs.php/idp.crt}
+      IAM_SAML_METADATA_LOOKUP_SERVICE_REFRESH_PERIOD_SEC: ${SAML_METADATA_LOOKUP_SERVICE_REFRESH_PERIOD_SEC:-3600}
       IAM_SAML_METADATA_REQUIRE_VALID_SIGNATURE: ${SAML_METADATA_REQUIRE_VALID_SIGNATURE:-false}
       IAM_SAML_METADATA_REQUIRE_SIRTFI: ${SAML_METADATA_REQUIRE_SIRTFI:-false}
-      IAM_LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY: ${LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY:-visible}
-      IAM_LOCAL_AUTHN_ENABLED_FOR: ${LOCAL_AUTHN_ENABLED_FOR:-all}
+      IAM_SAML_IDP_ENTITY_ID_WHITELIST: ${SAML_IDP_ENTITY_ID_WHITELIST}
+      IAM_SAML_MAX_ASSERTION_TIME: ${SAML_MAX_ASSERTION_TIME:-3000}
+      IAM_SAML_MAX_AUTHENTICATION_AGE: ${SAML_MAX_AUTHENTICATION_AGE:-86400}
+      IAM_SAML_ID_RESOLVERS: ${SAML_ID_RESOLVERS:-eduPersonUniqueId,eduPersonTargetedId,eduPersonPrincipalName}
+      # Notification service settings
+      IAM_MAIL_HOST: ${MAIL_HOST:-smtp-cc.infn.it}
+      IAM_MAIL_PORT: ${MAIL_PORT:-587}
+      IAM_MAIL_USERNAME: ${MAIL_USERNAME:-mail}
+      IAM_MAIL_PASSWORD: ${MAIL_PASSWORD:-pwd}
+      IAM_NOTIFICATION_DISABLE: ${NOTIFICATION_DISABLE:-false}
+      IAM_NOTIFICATION_FROM: ${NOTIFICATION_FROM:-admin}
+      IAM_NOTIFICATION_ADMIN_ADDRESS: ${NOTIFICATION_ADMIN_ADDRESS:-admin@local.io}
+      IAM_NOTIFICATION_TASK_DELAY: ${NOTIFICATION_TASK_DELAY:-30000}
+      IAM_NOTIFICATION_CLEANUP_AGE: ${NOTIFICATION_CLEANUP_AGE:-30}
+      # Account linking settings
+      IAM_ACCOUNT_LINKING_DISABLE: ${ACCOUNT_LINKING_DISABLE:-false}
+      # Privacy policy settings 
+      IAM_PRIVACY_POLICY_URL: ${PRIVACY_POLICY_URL}
+      IAM_PRIVACY_POLICY_TEXT: ${PRIVACY_POLICY_TEXT:-Privacy policy}
+      # JWT default profile
+      IAM_JWT_DEFAULT_PROFILE: ${JWT_DEFAULT_PROFILE:-iam}
     volumes:
       - config:/config
       - scripts:/scripts
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
+      - trustanchors:/etc/grid-security/certificates
     networks:
       - net
     depends_on:
