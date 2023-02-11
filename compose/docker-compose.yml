@@ -9,6 +9,7 @@ volumes:
   conf.d:
   config:
   letsencrypt:
+  redis:
 
 networks:
   net:
@@ -193,13 +194,17 @@ services:
       IAM_CLIENT_SCOPES: ${CLIENT_SCOPES:-openid profile email}
       IAM_CLIENT_FORWARD_HEADERS_STRATEGY: ${CLIENT_FORWARD_HEADERS_STRATEGY:-none}
       # Redis configuration
-      IAM_SPRING_REDIS_HOST: ${SPRING_REDIS_HOST:-localhost}
+      IAM_SPRING_REDIS_HOST: ${SPRING_REDIS_HOST:-redis}
       IAM_SPRING_REDIS_PORT: ${SPRING_REDIS_PORT:-6397}
-      IAM_SPRING_REDIS_PASSWORD: ${SPRING_REDIS_PASSWORD:-secret}
+      IAM_SPRING_REDIS_PASSWORD: ${SPRING_REDIS_PASSWORD}
       IAM_SESSION_TIMEOUT_SECS: ${SESSION_TIMEOUT_SECS:-1800}
       IAM_SPRING_SESSION_STORE_TYPE: ${SPRING_SESSION_STORE_TYPE:-none}
       IAM_HEALTH_REDIS_PROBE_ENABLED: ${HEALTH_REDIS_PROBE_ENABLED:-false}
       # Registration settings
+      IAM_REGISTRATION_SHOW_REGISTRATION_BUTTON_IN_LOGIN_PAGE: ${REGISTRATION_SHOW_REGISTRATION_BUTTON_IN_LOGIN_PAGE:-true}
+      IAM_REGISTRATION_OIDC_ISSUER: ${REGISTRATION_OIDC_ISSUER:-https://example.org}
+      IAM_REGISTRATION_SAML_ENTITY_ID: ${REGISTRATION_SAML_ENTITY_ID:-urn:example}
+      IAM_REGISTRATION_REQUIRE_EXTERNAL_AUTHENTICATION: ${REGISTRATION_REQUIRE_EXTERNAL_AUTHENTICATION:-false}
       IAM_REGISTRATION_AUTHENTICATION_TYPE: ${REGISTRATION_AUTHENTICATION_TYPE:-oidc}
       IAM_REGISTRATION_USERNAME_ATTRIBUTE: ${REGISTRATION_USERNAME_ATTRIBUTE:-preferred_username}
       IAM_REGISTRATION_NAME_ATTRIBUTE: ${REGISTRATION_NAME_ATTRIBUTE:-given_name}
@@ -293,6 +298,23 @@ services:
       - net
     depends_on:
       - sidecar
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    command: ["--databases", "1"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - net
 
   client:
     image: indigoiam/iam-test-client:latest
