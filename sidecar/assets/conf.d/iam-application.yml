@@ -161,17 +161,17 @@ iam:
     authentication-type: ${IAM_REGISTRATION_AUTHENTICATION_TYPE:oidc}
     fields:
       name:
-        read-only: ${IAM_REGISTRATION_SAML_NAME_READONLY:false}
-        external-auth-attribute: given_name
+        read-only: ${IAM_REGISTRATION_NAME_READONLY:false}
+        external-auth-attribute: ${IAM_REGISTRATION_NAME_ATTRIBUTE:given_name}
       surname:
-        read-only: ${IAM_REGISTRATION_SAML_SURNAME_READONLY:false}
-        external-auth-attribute: family_name
+        read-only: ${IAM_REGISTRATION_SURNAME_READONLY:false}
+        external-auth-attribute: ${IAM_REGISTRATION_SURNAME_ATTRIBUTE:family_name}
       email:
-        read-only: ${IAM_REGISTRATION_SAML_EMAIL_READONLY:false}
-        external-auth-attribute: email
+        read-only: ${IAM_REGISTRATION_EMAIL_READONLY:false}
+        external-auth-attribute: ${IAM_REGISTRATION_EMAIL_ATTRIBUTE:email}
       username:
-        read-only: ${IAM_REGISTRATION_SAML_USERNAME_READONLY:false}
-        external-auth-attribute: UID
+        read-only: ${IAM_REGISTRATION_USERNAME_READONLY:false}
+        external-auth-attribute: ${IAM_REGISTRATION_USERNAME_ATTRIBUTE:preferred_username}
 
   local-authn:
     login-page-visibility: ${IAM_LOCAL_AUTHN_LOGIN_PAGE_VISIBILITY:visible}
