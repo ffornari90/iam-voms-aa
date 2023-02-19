@@ -76,9 +76,9 @@ spring:
     properties:
       mail:
         smtp:
-          auth: true
+          auth: ${IAM_MAIL_SMTP_AUTH:false}
           starttls:
-            enable: true
+            enable: ${IAM_MAIL_SMTP_STARTTLS:false}
 
   flyway:
     table: schema_version
