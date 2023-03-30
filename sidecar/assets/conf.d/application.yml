@@ -37,5 +37,6 @@ voms:
     host: ${IAM_HOST}
     port: ${server.port}
     vo-name: ${VO}
+    use-legacy-fqan-encoding: ${LEGACY_FQAN_ENCODING}
     max-ac-lifetime-in-seconds: ${MAX_AC_LIFETIME}
     optional-group-label: voms.role
