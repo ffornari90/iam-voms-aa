@@ -88,7 +88,7 @@ services:
       - proxy
 
   trust:
-    image: indigoiam/egi-trustanchors:latest
+    image: indigoiam/egi-trustanchors:main
     container_name: trust
     hostname: trust
     entrypoint:
