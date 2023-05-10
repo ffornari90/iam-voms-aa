@@ -8,7 +8,7 @@ COPY ./assets/conf.d/iam-application.yml /
 RUN yum install -y epel-release && \
     yum clean all && \
     rm -rf /var/cache/yum && \
-    yum install -y openssl gettext jq netcat && \
+    yum install -y openssl gettext jq netcat java-11-openjdk-headless git maven && \
     yum clean all && \
     rm -rf /var/cache/yum && \
     chmod +x /wait-for-it.sh

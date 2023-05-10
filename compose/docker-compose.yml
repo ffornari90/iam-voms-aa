@@ -53,7 +53,7 @@ services:
       - net
 
   sidecar:
-    image: ffornari/sidecar:latest
+    image: ffornari/sidecar:mvn
     container_name: sidecar
     command: /bin/bash -c "
         cp /wait-for-it.sh /scripts/
@@ -61,6 +61,9 @@ services:
         && cd /config
         && if [ ! -f /config/self-signed.key.pem ]; then openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST; fi
         && if [ ! -f /config/self-signed.p12 ]; then openssl pkcs12 -export -inkey self-signed.key.pem -name self-signed -in self-signed.cert.pem -out self-signed.p12 -password pass:$$IAM_SAML_KEY_PASSWORD; fi
+        && if [ ! -f /config/keystore.jwks ]; then git clone https://github.com/mitreid-connect/json-web-key-generator.git; cd json-web-key-generator; git checkout tags/json-web-key-generator-0.7; mvn package;
+        java -jar target/json-web-key-generator-0.7-jar-with-dependencies.jar -t RSA -s 2048 -S | awk '/^{/,/^}$$/ {print}' > /config/keystore.jwks;
+        cd ..; rm -rf json-web-key-generator; fi
         && while true; do output=$$(jq -r '.myhttpchallenge | .Certificates[] | select(.domain.main==\"'$$IAM_HOST'\") | .key'
            /letsencrypt/acme.json 2>/dev/null | base64 -d | tee /certs/hostkey.pem);
            if [[ -z \"$$output\" || $$? -ne 0 ]]; then sleep 5; else break; fi; done
@@ -134,6 +137,8 @@ services:
         && openssl x509 -outform der -in /usr/local/share/ca-certificates/idp.crt -out idp.der
         && if [ ! -f /config/self-signed.jks ]; then keytool -importkeystore -destkeystore /config/self-signed.jks -srckeystore /config/self-signed.p12 -srcstoretype PKCS12 -storepass $$IAM_SAML_KEYSTORE_PASSWORD -srcstorepass $$IAM_SAML_KEY_PASSWORD
         && keytool -import -alias idp -file idp.der -keystore /config/self-signed.jks -storepass $$IAM_SAML_KEYSTORE_PASSWORD -noprompt; fi
+        && while true; do if [ ! -s /config/keystore.jwks ]; then sleep 5; else break; fi; done
+        && cp /config/keystore.jwks /indigo-iam/WEB-INF/classes/keystore.jwks
         && while true; do if [ ! -s /config/iam-application.yml ]; then sleep 5; else break; fi; done
         && cp /config/iam-application.yml /indigo-iam/WEB-INF/classes/application.yml
         && if [[ $$IAM_VERS =~ \"v1.6.\" ]]; then java $$IAM_JAVA_MEM_OPTS $$IAM_JAVA_OPTS -Dspring.profiles.active=$$IAM_ACTIVE_PROFILES -jar iam-login-service.war;
