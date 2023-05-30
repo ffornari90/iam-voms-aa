@@ -62,7 +62,7 @@ services:
         && if [ ! -f /config/self-signed.key.pem ]; then openssl req -newkey rsa:2048 -nodes -x509 -days 1825 -keyout self-signed.key.pem -out self-signed.cert.pem -subj '/CN='$$IAM_HOST; fi
         && if [ ! -f /config/self-signed.p12 ]; then openssl pkcs12 -export -inkey self-signed.key.pem -name self-signed -in self-signed.cert.pem -out self-signed.p12 -password pass:$$IAM_SAML_KEY_PASSWORD; fi
         && if [ ! -f /config/keystore.jwks ]; then git clone https://github.com/mitreid-connect/json-web-key-generator.git; cd json-web-key-generator; git checkout tags/json-web-key-generator-0.7; mvn package;
-        java -jar target/json-web-key-generator-0.7-jar-with-dependencies.jar -t RSA -s 2048 -S | awk '/^{/,/^}$$/ {print}' > /config/keystore.jwks;
+        java -jar target/json-web-key-generator-0.7-jar-with-dependencies.jar -t RSA -i rsa1 -s 2048 -S | awk '/^{/,/^}$$/ {print}' > /config/keystore.jwks;
         cd ..; rm -rf json-web-key-generator; fi
         && while true; do output=$$(jq -r '.myhttpchallenge | .Certificates[] | select(.domain.main==\"'$$IAM_HOST'\") | .key'
            /letsencrypt/acme.json 2>/dev/null | base64 -d | tee /certs/hostkey.pem);
