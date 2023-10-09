@@ -1,0 +1,1 @@
+printf '%s,\n%s\n%s\n%s\n%s\n' "$(sed -n '/{/,/}/p' /config/jwkg_output.txt | grep -v '}')" "      \"x5c\": [\""$(cat /config/jwkg_output.txt | sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' | awk '!/-----/ {printf "%s", $0}')"\"]" "    }" "  ]" "}" > /config/full_key.jwks
